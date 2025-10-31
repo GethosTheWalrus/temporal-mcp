@@ -1,1 +1,0 @@
-"""Temporal MCP Server Package."""
