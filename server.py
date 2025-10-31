@@ -1,13 +1,18 @@
 """MCP Server for Temporal workflow orchestration."""
 
 import asyncio
+import base64
 import json
+import os
+import sys
+import traceback
 from typing import Any, Optional
 from datetime import timedelta
 
 from mcp.server import Server
+from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
-from temporalio.client import Client
+from temporalio.client import Client, TLSConfig, Schedule, ScheduleActionStartWorkflow, ScheduleSpec, ScheduleIntervalSpec
 
 #"TEMPORAL_HOST": "host.docker.internal:7233"
 #"TEMPORAL_HOST": "temporal.dev.use2.hscp-workload-dev.aws.paylocity.private:7233"
@@ -15,13 +20,18 @@ from temporalio.client import Client
 class TemporalMCPServer:
     """MCP Server that provides tools for interacting with Temporal."""
 
-    def __init__(self, temporal_host: str = "localhost:7233"):
+    def __init__(self, temporal_host: str = "localhost:7233", namespace: str = "default", 
+                 tls_enabled: Optional[bool] = None):
         """Initialize the Temporal MCP server.
         
         Args:
             temporal_host: The Temporal server host and port
+            namespace: The Temporal namespace to use
+            tls_enabled: Whether to use TLS for connection (None = auto-detect, True = force enable, False = force disable)
         """
         self.temporal_host = temporal_host
+        self.namespace = namespace
+        self.tls_enabled = tls_enabled
         self.client: Optional[Client] = None
         self.server = Server("temporal-mcp-server")
         self._setup_handlers()
@@ -29,7 +39,45 @@ class TemporalMCPServer:
     async def connect(self):
         """Connect to Temporal server."""
         if not self.client:
-            self.client = await Client.connect(self.temporal_host)
+            # Determine if we need TLS
+            # Priority: explicit tls_enabled setting > auto-detect from hostname
+            tls_config = None
+            
+            if self.tls_enabled is True:
+                # Explicitly enabled
+                tls_config = TLSConfig()
+                print(f"Connecting to {self.temporal_host} with TLS enabled (explicit)", file=sys.stderr)
+            elif self.tls_enabled is False:
+                # Explicitly disabled
+                tls_config = None
+                print(f"Connecting to {self.temporal_host} without TLS (explicit)", file=sys.stderr)
+            elif (
+                "localhost" not in self.temporal_host and 
+                "127.0.0.1" not in self.temporal_host and
+                "host.docker.internal" not in self.temporal_host
+            ):
+                # Auto-detect: enable TLS for remote connections
+                tls_config = TLSConfig()
+                print(f"Connecting to {self.temporal_host} with TLS enabled (auto-detected for remote host)", file=sys.stderr)
+            else:
+                # Auto-detect: disable TLS for local connections
+                print(f"Connecting to {self.temporal_host} without TLS (auto-detected for local host)", file=sys.stderr)
+            
+            print(f"Namespace: {self.namespace}", file=sys.stderr)
+            print(f"TLS Enabled: {tls_config is not None}", file=sys.stderr)
+            
+            try:
+                self.client = await Client.connect(
+                    self.temporal_host,
+                    namespace=self.namespace,
+                    tls=tls_config,
+                )
+                print(f"Successfully connected to Temporal at {self.temporal_host}", file=sys.stderr)
+            except Exception as e:
+                print(f"Failed to connect to Temporal at {self.temporal_host}: {type(e).__name__}: {e}", file=sys.stderr)
+                import traceback
+                traceback.print_exc(file=sys.stderr)
+                raise
 
     async def disconnect(self):
         """Disconnect from Temporal server."""
@@ -158,7 +206,7 @@ class TemporalMCPServer:
                 ),
                 Tool(
                     name="list_workflows",
-                    description="List workflow executions based on a query",
+                    description="List workflow executions based on a query. Specify 'limit' to control the number of results (default: 100, max recommended: 1000). Use 'skip' to paginate through results.",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -168,7 +216,11 @@ class TemporalMCPServer:
                             },
                             "limit": {
                                 "type": "number",
-                                "description": "Maximum number of results to return"
+                                "description": "Maximum number of results to return (default: 100, increase for more results)"
+                            },
+                            "skip": {
+                                "type": "number",
+                                "description": "Number of results to skip for pagination (default: 0)"
                             }
                         }
                     }
@@ -193,7 +245,7 @@ class TemporalMCPServer:
                 ),
                 Tool(
                     name="get_workflow_history",
-                    description="Get the complete event history of a workflow execution",
+                    description="Get the complete event history of a workflow execution. Specify 'limit' to control the number of events (default: 1000).",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -203,7 +255,7 @@ class TemporalMCPServer:
                             },
                             "limit": {
                                 "type": "number",
-                                "description": "Maximum number of history events to return"
+                                "description": "Maximum number of history events to return (default: 1000)"
                             }
                         },
                         "required": ["workflow_id"]
@@ -211,7 +263,7 @@ class TemporalMCPServer:
                 ),
                 Tool(
                     name="batch_signal",
-                    description="Send a signal to multiple workflows matching a query",
+                    description="Send a signal to multiple workflows matching a query. Specify 'limit' to control batch size (default: 100).",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -229,7 +281,7 @@ class TemporalMCPServer:
                             },
                             "limit": {
                                 "type": "number",
-                                "description": "Maximum number of workflows to signal"
+                                "description": "Maximum number of workflows to signal (default: 100)"
                             }
                         },
                         "required": ["query", "signal_name"]
@@ -237,7 +289,7 @@ class TemporalMCPServer:
                 ),
                 Tool(
                     name="batch_cancel",
-                    description="Cancel multiple workflows matching a query",
+                    description="Cancel multiple workflows matching a query. Specify 'limit' to control batch size (default: 100).",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -247,7 +299,7 @@ class TemporalMCPServer:
                             },
                             "limit": {
                                 "type": "number",
-                                "description": "Maximum number of workflows to cancel"
+                                "description": "Maximum number of workflows to cancel (default: 100)"
                             }
                         },
                         "required": ["query"]
@@ -255,7 +307,7 @@ class TemporalMCPServer:
                 ),
                 Tool(
                     name="batch_terminate",
-                    description="Terminate multiple workflows matching a query",
+                    description="Terminate multiple workflows matching a query. Specify 'limit' to control batch size (default: 100).",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -269,7 +321,7 @@ class TemporalMCPServer:
                             },
                             "limit": {
                                 "type": "number",
-                                "description": "Maximum number of workflows to terminate"
+                                "description": "Maximum number of workflows to terminate (default: 100)"
                             }
                         },
                         "required": ["query"]
@@ -307,13 +359,17 @@ class TemporalMCPServer:
                 ),
                 Tool(
                     name="list_schedules",
-                    description="List all schedules",
+                    description="List all schedules. Specify 'limit' to control the number of results (default: 100). Use 'skip' to paginate through results.",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "limit": {
                                 "type": "number",
-                                "description": "Maximum number of schedules to return"
+                                "description": "Maximum number of schedules to return (default: 100)"
+                            },
+                            "skip": {
+                                "type": "number",
+                                "description": "Number of results to skip for pagination (default: 0)"
                             }
                         }
                     }
@@ -550,12 +606,21 @@ class TemporalMCPServer:
         return [TextContent(type="text", text=json.dumps(info, indent=2))]
 
     async def _list_workflows(self, args: dict) -> list[TextContent]:
-        """List workflow executions."""
+        """List workflow executions with skip-based pagination support."""
         query = args.get("query", "")
-        limit = args.get("limit", 10)
+        limit = args.get("limit", 100)
+        skip = args.get("skip", 0)
 
         workflows = []
+        count = 0
+        total_fetched = 0
+        
         async for workflow in self.client.list_workflows(query):
+            # Skip the first 'skip' results
+            if count < skip:
+                count += 1
+                continue
+            
             workflows.append({
                 "workflow_id": workflow.id,
                 "run_id": workflow.run_id,
@@ -563,12 +628,42 @@ class TemporalMCPServer:
                 "status": str(workflow.status),
                 "start_time": str(workflow.start_time),
             })
-            if len(workflows) >= limit:
+            count += 1
+            total_fetched += 1
+            
+            if total_fetched >= limit:
                 break
+        
+        # Check if there are more results by trying to fetch one more
+        has_more = False
+        try:
+            async for _ in self.client.list_workflows(query):
+                if count < skip + limit:
+                    count += 1
+                    continue
+                has_more = True
+                break
+        except:
+            pass
+        
+        result = {
+            "workflows": workflows,
+            "count": len(workflows),
+            "skip": skip,
+            "limit": limit
+        }
+        
+        if has_more:
+            result["has_more"] = True
+            result["next_skip"] = skip + limit
+            result["message"] = f"Showing {len(workflows)} workflows (skipped {skip}). More results available. Use skip={skip + limit} to get the next page."
+        else:
+            result["has_more"] = False
+            result["message"] = f"Showing all {len(workflows)} workflows (skipped {skip}). No more results."
         
         return [TextContent(
             type="text",
-            text=json.dumps({"workflows": workflows}, indent=2)
+            text=json.dumps(result, indent=2)
         )]
 
     async def _terminate_workflow(self, args: dict) -> list[TextContent]:
@@ -587,7 +682,7 @@ class TemporalMCPServer:
     async def _get_workflow_history(self, args: dict) -> list[TextContent]:
         """Get workflow execution history."""
         workflow_id = args["workflow_id"]
-        limit = args.get("limit", 100)
+        limit = args.get("limit", 1000)
 
         handle = self.client.get_workflow_handle(workflow_id)
         
@@ -611,7 +706,7 @@ class TemporalMCPServer:
         query = args["query"]
         signal_name = args["signal_name"]
         signal_args = args.get("args")
-        limit = args.get("limit", 10)
+        limit = args.get("limit", 100)
 
         workflows_signaled = []
         async for workflow in self.client.list_workflows(query):
@@ -637,7 +732,7 @@ class TemporalMCPServer:
     async def _batch_cancel(self, args: dict) -> list[TextContent]:
         """Cancel multiple workflows."""
         query = args["query"]
-        limit = args.get("limit", 10)
+        limit = args.get("limit", 100)
 
         workflows_cancelled = []
         async for workflow in self.client.list_workflows(query):
@@ -663,7 +758,7 @@ class TemporalMCPServer:
         """Terminate multiple workflows."""
         query = args["query"]
         reason = args.get("reason", "Batch termination via MCP")
-        limit = args.get("limit", 10)
+        limit = args.get("limit", 100)
 
         workflows_terminated = []
         async for workflow in self.client.list_workflows(query):
@@ -688,9 +783,6 @@ class TemporalMCPServer:
 
     async def _create_schedule(self, args: dict) -> list[TextContent]:
         """Create a new workflow schedule."""
-        from temporalio.client import Schedule, ScheduleActionStartWorkflow, ScheduleSpec, ScheduleIntervalSpec
-        from datetime import timedelta
-        
         schedule_id = args["schedule_id"]
         workflow_name = args["workflow_name"]
         task_queue = args["task_queue"]
@@ -726,21 +818,60 @@ class TemporalMCPServer:
             )]
 
     async def _list_schedules(self, args: dict) -> list[TextContent]:
-        """List all schedules."""
-        limit = args.get("limit", 20)
+        """List all schedules with skip-based pagination."""
+        limit = args.get("limit", 100)
+        skip = args.get("skip", 0)
 
         schedules = []
+        count = 0
+        total_fetched = 0
+        
         async for schedule in self.client.list_schedules():
+            # Skip the first 'skip' results
+            if count < skip:
+                count += 1
+                continue
+                
             schedules.append({
                 "schedule_id": schedule.id,
                 "state": str(schedule.info.paused) if schedule.info else "unknown",
             })
-            if len(schedules) >= limit:
+            count += 1
+            total_fetched += 1
+            
+            if total_fetched >= limit:
                 break
+        
+        # Check if there are more results
+        has_more = False
+        try:
+            async for _ in self.client.list_schedules():
+                if count < skip + limit:
+                    count += 1
+                    continue
+                has_more = True
+                break
+        except:
+            pass
+        
+        result = {
+            "schedules": schedules,
+            "count": len(schedules),
+            "skip": skip,
+            "limit": limit
+        }
+        
+        if has_more:
+            result["has_more"] = True
+            result["next_skip"] = skip + limit
+            result["message"] = f"Showing {len(schedules)} schedules (skipped {skip}). More results available. Use skip={skip + limit} to get the next page."
+        else:
+            result["has_more"] = False
+            result["message"] = f"Showing all {len(schedules)} schedules (skipped {skip}). No more results."
         
         return [TextContent(
             type="text",
-            text=json.dumps({"schedules": schedules, "count": len(schedules)}, indent=2)
+            text=json.dumps(result, indent=2)
         )]
 
     async def _pause_schedule(self, args: dict) -> list[TextContent]:
@@ -821,8 +952,6 @@ class TemporalMCPServer:
         """Run the MCP server."""
         try:
             # The actual server running is handled by the MCP framework
-            from mcp.server.stdio import stdio_server
-            
             async with stdio_server() as (read_stream, write_stream):
                 await self.server.run(
                     read_stream,
@@ -835,9 +964,25 @@ class TemporalMCPServer:
 
 async def main():
     """Main entry point for the MCP server."""
-    import os
     temporal_host = os.environ.get("TEMPORAL_HOST", "localhost:7233")
-    server = TemporalMCPServer(temporal_host=temporal_host)
+    namespace = os.environ.get("TEMPORAL_NAMESPACE", "default")
+    
+    # Parse TLS setting: None (auto-detect), True (force enable), False (force disable)
+    tls_env = os.environ.get("TEMPORAL_TLS_ENABLED", "").lower()
+    if tls_env == "true":
+        tls_enabled = True
+    elif tls_env == "false":
+        tls_enabled = False
+    else:
+        tls_enabled = None  # Auto-detect
+    
+    print(f"Starting MCP server with TEMPORAL_HOST={temporal_host}, TLS={tls_enabled}", file=sys.stderr)
+    
+    server = TemporalMCPServer(
+        temporal_host=temporal_host,
+        namespace=namespace,
+        tls_enabled=tls_enabled
+    )
     await server.run()
 
 
