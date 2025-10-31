@@ -66,9 +66,9 @@ class TestQueryWorkflow:
         """Test successfully querying a workflow."""
         mcp_server.client = mock_client
         
-        # Mock workflow handle
-        mock_handle = MagicMock()
-        mock_handle.query = AsyncMock(return_value={"status": "running", "progress": 50})
+        # Mock workflow handle (get_workflow_handle is NOT async in real client)
+        mock_handle = AsyncMock()
+        mock_handle.query.return_value = {"status": "running", "progress": 50}
         mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         
         args = {
@@ -94,8 +94,7 @@ class TestSignalWorkflow:
         mcp_server.client = mock_client
         
         # Mock workflow handle
-        mock_handle = MagicMock()
-        mock_handle.signal = AsyncMock()
+        mock_handle = AsyncMock()
         mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         
         args = {
@@ -123,7 +122,7 @@ class TestCancelWorkflow:
         
         # Mock workflow handle
         mock_handle = AsyncMock()
-        mock_client.get_workflow_handle.return_value = mock_handle
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         
         args = {"workflow_id": "test-workflow-123"}
         
@@ -147,7 +146,7 @@ class TestGetWorkflowResult:
         # Mock workflow handle
         mock_handle = AsyncMock()
         mock_handle.result.return_value = {"output": "success", "value": 42}
-        mock_client.get_workflow_handle.return_value = mock_handle
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         
         args = {"workflow_id": "test-workflow-123"}
         
@@ -179,7 +178,7 @@ class TestDescribeWorkflow:
         
         mock_handle = AsyncMock()
         mock_handle.describe.return_value = mock_description
-        mock_client.get_workflow_handle.return_value = mock_handle
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         
         args = {"workflow_id": "test-workflow-123"}
         
@@ -242,7 +241,7 @@ class TestTerminateWorkflow:
         
         # Mock workflow handle
         mock_handle = AsyncMock()
-        mock_client.get_workflow_handle.return_value = mock_handle
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         
         args = {
             "workflow_id": "test-workflow-123",
@@ -284,7 +283,7 @@ class TestGetWorkflowHistory:
         
         mock_handle = AsyncMock()
         mock_handle.fetch_history = mock_fetch_history
-        mock_client.get_workflow_handle.return_value = mock_handle
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         
         args = {"workflow_id": "test-workflow-123", "limit": 100}
         
@@ -320,7 +319,7 @@ class TestBatchSignal:
         
         # Mock workflow handles
         mock_handle = AsyncMock()
-        mock_client.get_workflow_handle.return_value = mock_handle
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         
         args = {
             "query": "WorkflowType='TestWorkflow'",
@@ -358,7 +357,7 @@ class TestBatchCancel:
         
         # Mock workflow handle
         mock_handle = AsyncMock()
-        mock_client.get_workflow_handle.return_value = mock_handle
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         
         args = {
             "query": "WorkflowType='TestWorkflow'",
@@ -392,7 +391,7 @@ class TestBatchTerminate:
         
         # Mock workflow handle
         mock_handle = AsyncMock()
-        mock_client.get_workflow_handle.return_value = mock_handle
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         
         args = {
             "query": "WorkflowType='TestWorkflow'",
@@ -463,7 +462,7 @@ class TestScheduleOperations:
         mcp_server.client = mock_client
         
         mock_handle = AsyncMock()
-        mock_client.get_schedule_handle.return_value = mock_handle
+        mock_client.get_schedule_handle = MagicMock(return_value=mock_handle)
         
         args = {
             "schedule_id": "test-schedule",
@@ -485,7 +484,7 @@ class TestScheduleOperations:
         mcp_server.client = mock_client
         
         mock_handle = AsyncMock()
-        mock_client.get_schedule_handle.return_value = mock_handle
+        mock_client.get_schedule_handle = MagicMock(return_value=mock_handle)
         
         args = {
             "schedule_id": "test-schedule",
@@ -506,7 +505,7 @@ class TestScheduleOperations:
         mcp_server.client = mock_client
         
         mock_handle = AsyncMock()
-        mock_client.get_schedule_handle.return_value = mock_handle
+        mock_client.get_schedule_handle = MagicMock(return_value=mock_handle)
         
         args = {"schedule_id": "test-schedule"}
         
@@ -524,7 +523,7 @@ class TestScheduleOperations:
         mcp_server.client = mock_client
         
         mock_handle = AsyncMock()
-        mock_client.get_schedule_handle.return_value = mock_handle
+        mock_client.get_schedule_handle = MagicMock(return_value=mock_handle)
         
         args = {"schedule_id": "test-schedule"}
         
@@ -546,7 +545,7 @@ class TestContinueAsNew:
         mcp_server.client = mock_client
         
         mock_handle = AsyncMock()
-        mock_client.get_workflow_handle.return_value = mock_handle
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         
         args = {
             "workflow_id": "test-workflow-123",
@@ -595,7 +594,7 @@ class TestErrorHandling:
         
         mock_handle = AsyncMock()
         mock_handle.query.side_effect = Exception("Workflow not found")
-        mock_client.get_workflow_handle.return_value = mock_handle
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         
         args = {
             "workflow_id": "non-existent",
