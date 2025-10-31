@@ -1,0 +1,8 @@
+# Temporal SDK
+temporalio>=1.5.0
+
+# Model Context Protocol
+mcp>=0.9.0
+
+# Additional dependencies
+asyncio-atexit>=1.0.1
