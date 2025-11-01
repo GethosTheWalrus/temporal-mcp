@@ -12,7 +12,10 @@ from datetime import timedelta
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
-from temporalio.client import Client, TLSConfig, Schedule, ScheduleActionStartWorkflow, ScheduleSpec, ScheduleIntervalSpec
+from temporalio.client import Client, TLSConfig, Schedule, ScheduleActionStartWorkflow, ScheduleSpec, ScheduleIntervalSpec, RPCError, ScheduleAlreadyRunningError
+from temporalio.exceptions import WorkflowAlreadyStartedError
+from temporalio.service import RPCStatusCode
+from temporalio.api.enums.v1 import WorkflowExecutionStatus
 
 #"TEMPORAL_HOST": "host.docker.internal:7233"
 #"TEMPORAL_HOST": "temporal.dev.use2.hscp-workload-dev.aws.paylocity.private:7233"
@@ -82,8 +85,17 @@ class TemporalMCPServer:
     async def disconnect(self):
         """Disconnect from Temporal server."""
         if self.client:
-            await self.client.close()
-            self.client = None
+            try:
+                await self.client.close()
+            except Exception as e:
+                print(f"Error closing Temporal client: {e}", file=sys.stderr)
+            finally:
+                self.client = None
+
+    def _ensure_connected(self):
+        """Ensure client is connected."""
+        if not self.client:
+            raise RuntimeError("Not connected to Temporal server. Connection may have failed or been lost.")
 
     def _setup_handlers(self):
         """Set up MCP request handlers."""
@@ -465,7 +477,12 @@ class TemporalMCPServer:
         @self.server.call_tool()
         async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             """Handle tool execution requests."""
-            await self.connect()
+            try:
+                await self.connect()
+            except Exception as e:
+                error_msg = f"Failed to connect to Temporal server: {type(e).__name__}: {str(e)}"
+                print(error_msg, file=sys.stderr)
+                return [TextContent(type="text", text=json.dumps({"error": error_msg, "type": "connection_error"}, indent=2))]
             
             try:
                 if name == "start_workflow":
@@ -507,289 +524,414 @@ class TemporalMCPServer:
                 elif name == "continue_as_new":
                     return await self._continue_as_new(arguments)
                 else:
-                    return [TextContent(type="text", text=f"Unknown tool: {name}")]
+                    return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}", "type": "unknown_tool"}, indent=2))]
+            except KeyError as e:
+                error_msg = f"Missing required parameter: {str(e)}"
+                print(f"KeyError in {name}: {error_msg}", file=sys.stderr)
+                return [TextContent(type="text", text=json.dumps({"error": error_msg, "type": "missing_parameter", "tool": name}, indent=2))]
+            except RPCError as e:
+                # Handle RPC errors (including NOT_FOUND)
+                error_msg = str(e)
+                error_type = "rpc_error"
+                if e.status == RPCStatusCode.NOT_FOUND:
+                    error_type = "not_found"
+                    error_msg = f"Resource not found: {str(e)}"
+                elif e.status == RPCStatusCode.ALREADY_EXISTS:
+                    error_type = "already_exists"
+                    error_msg = f"Resource already exists: {str(e)}"
+                print(f"RPCError in {name}: {error_msg}", file=sys.stderr)
+                return [TextContent(type="text", text=json.dumps({"error": error_msg, "type": error_type, "tool": name}, indent=2))]
             except Exception as e:
-                return [TextContent(type="text", text=f"Error: {str(e)}")]
+                error_msg = f"Error executing {name}: {type(e).__name__}: {str(e)}"
+                print(error_msg, file=sys.stderr)
+                traceback.print_exc(file=sys.stderr)
+                return [TextContent(type="text", text=json.dumps({"error": str(e), "error_type": type(e).__name__, "tool": name}, indent=2))]
 
     async def _start_workflow(self, args: dict) -> list[TextContent]:
         """Start a new workflow execution."""
-        workflow_name = args["workflow_name"]
-        workflow_id = args["workflow_id"]
-        task_queue = args["task_queue"]
-        workflow_args = args.get("args", {})
+        try:
+            self._ensure_connected()
+            workflow_name = args["workflow_name"]
+            workflow_id = args["workflow_id"]
+            task_queue = args["task_queue"]
+            workflow_args = args.get("args", {})
 
-        # Note: This is a generic implementation. In practice, you would need
-        # to have the workflow class registered and imported
-        handle = await self.client.start_workflow(
-            workflow_name,
-            workflow_args,
-            id=workflow_id,
-            task_queue=task_queue,
-        )
+            # Note: This is a generic implementation. In practice, you would need
+            # to have the workflow class registered and imported
+            handle = await self.client.start_workflow(
+                workflow_name,
+                workflow_args,
+                id=workflow_id,
+                task_queue=task_queue,
+            )
 
-        result = {
-            "workflow_id": handle.id,
-            "run_id": handle.result_run_id,
-            "status": "started"
-        }
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+            result = {
+                "workflow_id": handle.id,
+                "run_id": handle.result_run_id,
+                "status": "started"
+            }
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        except WorkflowAlreadyStartedError as e:
+            return [TextContent(type="text", text=json.dumps({
+                "error": f"Workflow with ID '{args.get('workflow_id')}' already exists",
+                "type": "workflow_already_started"
+            }, indent=2))]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _query_workflow(self, args: dict) -> list[TextContent]:
         """Query a workflow execution."""
-        workflow_id = args["workflow_id"]
-        query_name = args["query_name"]
-        query_args = args.get("args")
+        try:
+            self._ensure_connected()
+            workflow_id = args["workflow_id"]
+            query_name = args["query_name"]
+            query_args = args.get("args")
 
-        handle = self.client.get_workflow_handle(workflow_id)
-        result = await handle.query(query_name, query_args)
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({"query_result": result}, indent=2)
-        )]
+            handle = self.client.get_workflow_handle(workflow_id)
+            result = await handle.query(query_name, query_args)
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps({"query_result": result}, indent=2, default=str)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _signal_workflow(self, args: dict) -> list[TextContent]:
         """Send a signal to a workflow."""
-        workflow_id = args["workflow_id"]
-        signal_name = args["signal_name"]
-        signal_args = args.get("args")
+        try:
+            self._ensure_connected()
+            workflow_id = args["workflow_id"]
+            signal_name = args["signal_name"]
+            signal_args = args.get("args")
 
-        handle = self.client.get_workflow_handle(workflow_id)
-        await handle.signal(signal_name, signal_args)
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({"status": "signal_sent"}, indent=2)
-        )]
+            handle = self.client.get_workflow_handle(workflow_id)
+            await handle.signal(signal_name, signal_args)
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps({"status": "signal_sent", "workflow_id": workflow_id, "signal_name": signal_name}, indent=2)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _cancel_workflow(self, args: dict) -> list[TextContent]:
         """Cancel a workflow execution."""
-        workflow_id = args["workflow_id"]
+        try:
+            self._ensure_connected()
+            workflow_id = args["workflow_id"]
 
-        handle = self.client.get_workflow_handle(workflow_id)
-        await handle.cancel()
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({"status": "cancelled"}, indent=2)
-        )]
+            handle = self.client.get_workflow_handle(workflow_id)
+            await handle.cancel()
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps({"status": "cancelled", "workflow_id": workflow_id}, indent=2)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _get_workflow_result(self, args: dict) -> list[TextContent]:
         """Get the result of a workflow execution."""
-        workflow_id = args["workflow_id"]
+        try:
+            self._ensure_connected()
+            workflow_id = args["workflow_id"]
+            timeout = args.get("timeout")  # Optional timeout in seconds
 
-        handle = self.client.get_workflow_handle(workflow_id)
-        result = await handle.result()
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({"result": result}, indent=2)
-        )]
+            handle = self.client.get_workflow_handle(workflow_id)
+            
+            # Add timeout support to prevent indefinite blocking
+            if timeout:
+                result = await asyncio.wait_for(handle.result(), timeout=timeout)
+            else:
+                result = await handle.result()
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps({"result": result, "workflow_id": workflow_id}, indent=2, default=str)
+            )]
+        except asyncio.TimeoutError:
+            return [TextContent(
+                type="text",
+                text=json.dumps({
+                    "error": f"Timeout waiting for workflow result after {timeout} seconds",
+                    "type": "timeout",
+                    "workflow_id": args.get("workflow_id"),
+                    "note": "Workflow may still be running. Use describe_workflow to check status."
+                }, indent=2)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _describe_workflow(self, args: dict) -> list[TextContent]:
         """Get detailed information about a workflow."""
-        workflow_id = args["workflow_id"]
+        try:
+            self._ensure_connected()
+            workflow_id = args["workflow_id"]
 
-        handle = self.client.get_workflow_handle(workflow_id)
-        description = await handle.describe()
-        
-        info = {
-            "workflow_id": description.id,
-            "run_id": description.run_id,
-            "workflow_type": description.workflow_type,
-            "status": str(description.status),
-            "start_time": str(description.start_time),
-            "execution_time": str(description.execution_time) if description.execution_time else None,
-            "close_time": str(description.close_time) if description.close_time else None,
-        }
-        
-        return [TextContent(type="text", text=json.dumps(info, indent=2))]
+            handle = self.client.get_workflow_handle(workflow_id)
+            description = await handle.describe()
+            
+            # Get the status name from the enum instead of the numeric value
+            status_name = WorkflowExecutionStatus.Name(description.status)
+            
+            info = {
+                "workflow_id": description.id,
+                "run_id": description.run_id,
+                "workflow_type": description.workflow_type,
+                "status": status_name,
+                "status_code": description.status,
+                "start_time": str(description.start_time),
+                "execution_time": str(description.execution_time) if description.execution_time else None,
+                "close_time": str(description.close_time) if description.close_time else None,
+            }
+            
+            return [TextContent(type="text", text=json.dumps(info, indent=2))]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _list_workflows(self, args: dict) -> list[TextContent]:
         """List workflow executions with skip-based pagination support."""
-        query = args.get("query", "")
-        limit = args.get("limit", 100)
-        skip = args.get("skip", 0)
-
-        workflows = []
-        count = 0
-        total_fetched = 0
-        
-        async for workflow in self.client.list_workflows(query):
-            # Skip the first 'skip' results
-            if count < skip:
-                count += 1
-                continue
-            
-            workflows.append({
-                "workflow_id": workflow.id,
-                "run_id": workflow.run_id,
-                "workflow_type": workflow.workflow_type,
-                "status": str(workflow.status),
-                "start_time": str(workflow.start_time),
-            })
-            count += 1
-            total_fetched += 1
-            
-            if total_fetched >= limit:
-                break
-        
-        # Check if there are more results by trying to fetch one more
-        has_more = False
         try:
-            async for _ in self.client.list_workflows(query):
-                if count < skip + limit:
+            self._ensure_connected()
+            query = args.get("query", "")
+            limit = args.get("limit", 100)
+            skip = args.get("skip", 0)
+
+            workflows = []
+            count = 0
+            total_fetched = 0
+            
+            async for workflow in self.client.list_workflows(query):
+                # Skip the first 'skip' results
+                if count < skip:
                     count += 1
                     continue
-                has_more = True
-                break
-        except:
-            pass
-        
-        result = {
-            "workflows": workflows,
-            "count": len(workflows),
-            "skip": skip,
-            "limit": limit
-        }
-        
-        if has_more:
-            result["has_more"] = True
-            result["next_skip"] = skip + limit
-            result["message"] = f"Showing {len(workflows)} workflows (skipped {skip}). More results available. Use skip={skip + limit} to get the next page."
-        else:
-            result["has_more"] = False
-            result["message"] = f"Showing all {len(workflows)} workflows (skipped {skip}). No more results."
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps(result, indent=2)
-        )]
+                
+                workflows.append({
+                    "workflow_id": workflow.id,
+                    "run_id": workflow.run_id,
+                    "workflow_type": workflow.workflow_type,
+                    "status": WorkflowExecutionStatus.Name(workflow.status),
+                    "status_code": workflow.status,
+                    "start_time": str(workflow.start_time),
+                })
+                count += 1
+                total_fetched += 1
+                
+                if total_fetched >= limit:
+                    break
+            
+            # Check if there are more results by trying to fetch one more
+            has_more = False
+            try:
+                async for _ in self.client.list_workflows(query):
+                    if count < skip + limit:
+                        count += 1
+                        continue
+                    has_more = True
+                    break
+            except Exception as e:
+                print(f"Warning: Error checking for more workflows: {e}", file=sys.stderr)
+                # Continue anyway with the results we have
+            
+            result = {
+                "workflows": workflows,
+                "count": len(workflows),
+                "skip": skip,
+                "limit": limit
+            }
+            
+            if has_more:
+                result["has_more"] = True
+                result["next_skip"] = skip + limit
+                result["message"] = f"Showing {len(workflows)} workflows (skipped {skip}). More results available. Use skip={skip + limit} to get the next page."
+            else:
+                result["has_more"] = False
+                result["message"] = f"Showing all {len(workflows)} workflows (skipped {skip}). No more results."
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps(result, indent=2)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _terminate_workflow(self, args: dict) -> list[TextContent]:
         """Terminate a workflow execution."""
-        workflow_id = args["workflow_id"]
-        reason = args.get("reason", "Terminated via MCP")
+        try:
+            self._ensure_connected()
+            workflow_id = args["workflow_id"]
+            reason = args.get("reason", "Terminated via MCP")
 
-        handle = self.client.get_workflow_handle(workflow_id)
-        await handle.terminate(reason)
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({"status": "terminated", "reason": reason}, indent=2)
-        )]
+            handle = self.client.get_workflow_handle(workflow_id)
+            await handle.terminate(reason)
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps({"status": "terminated", "workflow_id": workflow_id, "reason": reason}, indent=2)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _get_workflow_history(self, args: dict) -> list[TextContent]:
         """Get workflow execution history."""
-        workflow_id = args["workflow_id"]
-        limit = args.get("limit", 1000)
+        try:
+            self._ensure_connected()
+            workflow_id = args["workflow_id"]
+            limit = args.get("limit", 1000)
 
-        handle = self.client.get_workflow_handle(workflow_id)
-        
-        events = []
-        async for event in handle.fetch_history():
-            events.append({
-                "event_id": event.event_id,
-                "event_type": event.event_type,
-                "event_time": str(event.event_time),
-            })
-            if len(events) >= limit:
-                break
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({"workflow_id": workflow_id, "events": events, "count": len(events)}, indent=2)
-        )]
+            handle = self.client.get_workflow_handle(workflow_id)
+            
+            events = []
+            async for event in handle.fetch_history():
+                events.append({
+                    "event_id": event.event_id,
+                    "event_type": event.event_type,
+                    "event_time": str(event.event_time),
+                })
+                if len(events) >= limit:
+                    break
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps({"workflow_id": workflow_id, "events": events, "count": len(events)}, indent=2)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _batch_signal(self, args: dict) -> list[TextContent]:
         """Send signal to multiple workflows."""
-        query = args["query"]
-        signal_name = args["signal_name"]
-        signal_args = args.get("args")
-        limit = args.get("limit", 100)
+        try:
+            self._ensure_connected()
+            query = args["query"]
+            signal_name = args["signal_name"]
+            signal_args = args.get("args")
+            limit = args.get("limit", 100)
 
-        workflows_signaled = []
-        async for workflow in self.client.list_workflows(query):
-            if len(workflows_signaled) >= limit:
-                break
+            workflows_signaled = []
+            errors = []
             
-            try:
-                handle = self.client.get_workflow_handle(workflow.id)
-                await handle.signal(signal_name, signal_args)
-                workflows_signaled.append(workflow.id)
-            except Exception as e:
-                workflows_signaled.append(f"{workflow.id} (error: {str(e)})")
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({
+            async for workflow in self.client.list_workflows(query):
+                if len(workflows_signaled) + len(errors) >= limit:
+                    break
+                
+                try:
+                    handle = self.client.get_workflow_handle(workflow.id)
+                    await handle.signal(signal_name, signal_args)
+                    workflows_signaled.append(workflow.id)
+                except Exception as e:
+                    error_detail = {"workflow_id": workflow.id, "error": str(e), "error_type": type(e).__name__}
+                    errors.append(error_detail)
+                    print(f"Error signaling workflow {workflow.id}: {e}", file=sys.stderr)
+            
+            result = {
                 "signal_name": signal_name,
                 "workflows_signaled": workflows_signaled,
-                "count": len(workflows_signaled)
-            }, indent=2)
-        )]
+                "success_count": len(workflows_signaled),
+                "error_count": len(errors)
+            }
+            
+            if errors:
+                result["errors"] = errors
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps(result, indent=2)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _batch_cancel(self, args: dict) -> list[TextContent]:
         """Cancel multiple workflows."""
-        query = args["query"]
-        limit = args.get("limit", 100)
+        try:
+            self._ensure_connected()
+            query = args["query"]
+            limit = args.get("limit", 100)
 
-        workflows_cancelled = []
-        async for workflow in self.client.list_workflows(query):
-            if len(workflows_cancelled) >= limit:
-                break
+            workflows_cancelled = []
+            errors = []
             
-            try:
-                handle = self.client.get_workflow_handle(workflow.id)
-                await handle.cancel()
-                workflows_cancelled.append(workflow.id)
-            except Exception as e:
-                workflows_cancelled.append(f"{workflow.id} (error: {str(e)})")
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({
+            async for workflow in self.client.list_workflows(query):
+                if len(workflows_cancelled) + len(errors) >= limit:
+                    break
+                
+                try:
+                    handle = self.client.get_workflow_handle(workflow.id)
+                    await handle.cancel()
+                    workflows_cancelled.append(workflow.id)
+                except Exception as e:
+                    error_detail = {"workflow_id": workflow.id, "error": str(e), "error_type": type(e).__name__}
+                    errors.append(error_detail)
+                    print(f"Error cancelling workflow {workflow.id}: {e}", file=sys.stderr)
+            
+            result = {
                 "workflows_cancelled": workflows_cancelled,
-                "count": len(workflows_cancelled)
-            }, indent=2)
-        )]
+                "success_count": len(workflows_cancelled),
+                "error_count": len(errors)
+            }
+            
+            if errors:
+                result["errors"] = errors
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps(result, indent=2)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _batch_terminate(self, args: dict) -> list[TextContent]:
         """Terminate multiple workflows."""
-        query = args["query"]
-        reason = args.get("reason", "Batch termination via MCP")
-        limit = args.get("limit", 100)
+        try:
+            self._ensure_connected()
+            query = args["query"]
+            reason = args.get("reason", "Batch termination via MCP")
+            limit = args.get("limit", 100)
 
-        workflows_terminated = []
-        async for workflow in self.client.list_workflows(query):
-            if len(workflows_terminated) >= limit:
-                break
+            workflows_terminated = []
+            errors = []
             
-            try:
-                handle = self.client.get_workflow_handle(workflow.id)
-                await handle.terminate(reason)
-                workflows_terminated.append(workflow.id)
-            except Exception as e:
-                workflows_terminated.append(f"{workflow.id} (error: {str(e)})")
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({
+            async for workflow in self.client.list_workflows(query):
+                if len(workflows_terminated) + len(errors) >= limit:
+                    break
+                
+                try:
+                    handle = self.client.get_workflow_handle(workflow.id)
+                    await handle.terminate(reason)
+                    workflows_terminated.append(workflow.id)
+                except Exception as e:
+                    error_detail = {"workflow_id": workflow.id, "error": str(e), "error_type": type(e).__name__}
+                    errors.append(error_detail)
+                    print(f"Error terminating workflow {workflow.id}: {e}", file=sys.stderr)
+            
+            result = {
                 "reason": reason,
                 "workflows_terminated": workflows_terminated,
-                "count": len(workflows_terminated)
-            }, indent=2)
-        )]
+                "success_count": len(workflows_terminated),
+                "error_count": len(errors)
+            }
+            
+            if errors:
+                result["errors"] = errors
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps(result, indent=2)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _create_schedule(self, args: dict) -> list[TextContent]:
         """Create a new workflow schedule."""
-        schedule_id = args["schedule_id"]
-        workflow_name = args["workflow_name"]
-        task_queue = args["task_queue"]
-        cron = args["cron"]
-        workflow_args = args.get("args", {})
-
         try:
+            self._ensure_connected()
+            schedule_id = args["schedule_id"]
+            workflow_name = args["workflow_name"]
+            task_queue = args["task_queue"]
+            cron = args["cron"]
+            workflow_args = args.get("args", {})
+
             await self.client.create_schedule(
                 schedule_id,
                 Schedule(
@@ -808,121 +950,148 @@ class TemporalMCPServer:
                 text=json.dumps({
                     "status": "created",
                     "schedule_id": schedule_id,
+                    "workflow_name": workflow_name,
                     "cron": cron
                 }, indent=2)
             )]
-        except Exception as e:
+        except ScheduleAlreadyRunningError:
             return [TextContent(
                 type="text",
-                text=json.dumps({"error": str(e)}, indent=2)
+                text=json.dumps({
+                    "error": f"Schedule with ID '{args.get('schedule_id')}' already exists",
+                    "type": "schedule_already_exists"
+                }, indent=2)
             )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _list_schedules(self, args: dict) -> list[TextContent]:
         """List all schedules with skip-based pagination."""
-        limit = args.get("limit", 100)
-        skip = args.get("skip", 0)
-
-        schedules = []
-        count = 0
-        total_fetched = 0
-        
-        async for schedule in self.client.list_schedules():
-            # Skip the first 'skip' results
-            if count < skip:
-                count += 1
-                continue
-                
-            schedules.append({
-                "schedule_id": schedule.id,
-                "state": str(schedule.info.paused) if schedule.info else "unknown",
-            })
-            count += 1
-            total_fetched += 1
-            
-            if total_fetched >= limit:
-                break
-        
-        # Check if there are more results
-        has_more = False
         try:
-            async for _ in self.client.list_schedules():
-                if count < skip + limit:
+            self._ensure_connected()
+            limit = args.get("limit", 100)
+            skip = args.get("skip", 0)
+
+            schedules = []
+            count = 0
+            total_fetched = 0
+            
+            async for schedule in self.client.list_schedules():
+                # Skip the first 'skip' results
+                if count < skip:
                     count += 1
                     continue
-                has_more = True
-                break
-        except:
-            pass
-        
-        result = {
-            "schedules": schedules,
-            "count": len(schedules),
-            "skip": skip,
-            "limit": limit
-        }
-        
-        if has_more:
-            result["has_more"] = True
-            result["next_skip"] = skip + limit
-            result["message"] = f"Showing {len(schedules)} schedules (skipped {skip}). More results available. Use skip={skip + limit} to get the next page."
-        else:
-            result["has_more"] = False
-            result["message"] = f"Showing all {len(schedules)} schedules (skipped {skip}). No more results."
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps(result, indent=2)
-        )]
+                    
+                schedules.append({
+                    "schedule_id": schedule.id,
+                    "state": str(schedule.info.paused) if schedule.info else "unknown",
+                })
+                count += 1
+                total_fetched += 1
+                
+                if total_fetched >= limit:
+                    break
+            
+            # Check if there are more results
+            has_more = False
+            try:
+                async for _ in self.client.list_schedules():
+                    if count < skip + limit:
+                        count += 1
+                        continue
+                    has_more = True
+                    break
+            except Exception as e:
+                print(f"Warning: Error checking for more schedules: {e}", file=sys.stderr)
+                # Continue anyway with the results we have
+            
+            result = {
+                "schedules": schedules,
+                "count": len(schedules),
+                "skip": skip,
+                "limit": limit
+            }
+            
+            if has_more:
+                result["has_more"] = True
+                result["next_skip"] = skip + limit
+                result["message"] = f"Showing {len(schedules)} schedules (skipped {skip}). More results available. Use skip={skip + limit} to get the next page."
+            else:
+                result["has_more"] = False
+                result["message"] = f"Showing all {len(schedules)} schedules (skipped {skip}). No more results."
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps(result, indent=2)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _pause_schedule(self, args: dict) -> list[TextContent]:
         """Pause a schedule."""
-        schedule_id = args["schedule_id"]
-        note = args.get("note", "Paused via MCP")
+        try:
+            self._ensure_connected()
+            schedule_id = args["schedule_id"]
+            note = args.get("note", "Paused via MCP")
 
-        handle = self.client.get_schedule_handle(schedule_id)
-        await handle.pause(note=note)
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({"status": "paused", "schedule_id": schedule_id}, indent=2)
-        )]
+            handle = self.client.get_schedule_handle(schedule_id)
+            await handle.pause(note=note)
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps({"status": "paused", "schedule_id": schedule_id, "note": note}, indent=2)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _unpause_schedule(self, args: dict) -> list[TextContent]:
         """Resume a schedule."""
-        schedule_id = args["schedule_id"]
-        note = args.get("note", "Resumed via MCP")
+        try:
+            self._ensure_connected()
+            schedule_id = args["schedule_id"]
+            note = args.get("note", "Resumed via MCP")
 
-        handle = self.client.get_schedule_handle(schedule_id)
-        await handle.unpause(note=note)
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({"status": "unpaused", "schedule_id": schedule_id}, indent=2)
-        )]
+            handle = self.client.get_schedule_handle(schedule_id)
+            await handle.unpause(note=note)
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps({"status": "unpaused", "schedule_id": schedule_id, "note": note}, indent=2)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _delete_schedule(self, args: dict) -> list[TextContent]:
         """Delete a schedule."""
-        schedule_id = args["schedule_id"]
+        try:
+            self._ensure_connected()
+            schedule_id = args["schedule_id"]
 
-        handle = self.client.get_schedule_handle(schedule_id)
-        await handle.delete()
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({"status": "deleted", "schedule_id": schedule_id}, indent=2)
-        )]
+            handle = self.client.get_schedule_handle(schedule_id)
+            await handle.delete()
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps({"status": "deleted", "schedule_id": schedule_id}, indent=2)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _trigger_schedule(self, args: dict) -> list[TextContent]:
         """Manually trigger a schedule."""
-        schedule_id = args["schedule_id"]
+        try:
+            self._ensure_connected()
+            schedule_id = args["schedule_id"]
 
-        handle = self.client.get_schedule_handle(schedule_id)
-        await handle.trigger()
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({"status": "triggered", "schedule_id": schedule_id}, indent=2)
-        )]
+            handle = self.client.get_schedule_handle(schedule_id)
+            await handle.trigger()
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps({"status": "triggered", "schedule_id": schedule_id}, indent=2)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def _continue_as_new(self, args: dict) -> list[TextContent]:
         """Signal a workflow to continue as new.
@@ -931,22 +1100,26 @@ class TemporalMCPServer:
         designed to call workflow.continue_as_new() when it receives this signal.
         This is just a helper to trigger that behavior via signal.
         """
-        workflow_id = args["workflow_id"]
-        signal_name = args["signal_name"]
-        signal_args = args.get("signal_args", {})
-        
-        handle = self.client.get_workflow_handle(workflow_id)
-        await handle.signal(signal_name, signal_args)
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "status": "signal_sent",
-                "workflow_id": workflow_id,
-                "signal_name": signal_name,
-                "note": "Workflow must implement continue-as-new logic in signal handler"
-            }, indent=2)
-        )]
+        try:
+            self._ensure_connected()
+            workflow_id = args["workflow_id"]
+            signal_name = args["signal_name"]
+            signal_args = args.get("signal_args", {})
+            
+            handle = self.client.get_workflow_handle(workflow_id)
+            await handle.signal(signal_name, signal_args)
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps({
+                    "status": "signal_sent",
+                    "workflow_id": workflow_id,
+                    "signal_name": signal_name,
+                    "note": "Workflow must implement continue-as-new logic in signal handler"
+                }, indent=2)
+            )]
+        except Exception as e:
+            raise  # Re-raise to be caught by call_tool handler
 
     async def run(self):
         """Run the MCP server."""
