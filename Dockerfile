@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the application code
 COPY server.py .
 COPY pyproject.toml .
+COPY temporal_mcp/ ./temporal_mcp/
 
 # Run via stdio - this is the MCP standard
 CMD ["python", "-u", "server.py"]
