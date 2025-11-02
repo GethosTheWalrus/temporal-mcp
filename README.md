@@ -71,9 +71,9 @@ Add to your OpenCode settings (`~/.config/opencode/opencode.json`):
 }
 ```
 
-### VS Code (Cline Extension)
+### VS Code (Copilot MCP)
 
-Add to your VS Code settings (`.vscode/settings.json` or user settings):
+Add to your VS Code settings (`.vscode/mcp.json` or global settings):
 
 ```json
 {
