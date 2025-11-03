@@ -345,8 +345,8 @@ class TestBatchCancel:
         
         assert len(result) == 1
         response = json.loads(result[0].text)
-        assert len(response["workflows_cancelled"]) == 1
-        assert "workflow-1" in response["workflows_cancelled"]
+        assert len(response["cancelled_workflows"]) == 1
+        assert "workflow-1" in response["cancelled_workflows"]
 class TestBatchTerminate:
     """Tests for batch_terminate tool."""
     
@@ -378,7 +378,7 @@ class TestBatchTerminate:
         
         assert len(result) == 1
         response = json.loads(result[0].text)
-        assert len(response["workflows_terminated"]) == 1
+        assert len(response["terminated_workflows"]) == 1
         assert response["reason"] == "Batch cleanup"
 class TestScheduleOperations:
     """Tests for schedule management tools."""
