@@ -207,7 +207,7 @@ def get_all_tools() -> list[Tool]:
         ),
         Tool(
             name="batch_cancel",
-            description="Cancel multiple workflows matching a query. Specify 'limit' to control batch size (default: 100).",
+            description="Cancel multiple workflows matching a query with concurrent processing for speed. Use 'concurrency' to control parallel operations (default: 50).",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -218,6 +218,10 @@ def get_all_tools() -> list[Tool]:
                     "limit": {
                         "type": "number",
                         "description": "Maximum number of workflows to cancel (default: 100)"
+                    },
+                    "concurrency": {
+                        "type": "number",
+                        "description": "Number of workflows to cancel concurrently for faster processing (default: 50, max recommended: 100)"
                     }
                 },
                 "required": ["query"]
