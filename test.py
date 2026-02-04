@@ -258,12 +258,12 @@ class TestGetWorkflowHistory:
         mock_event2.event_type = "ActivityTaskScheduled"
         mock_event2.event_time = datetime(2025, 10, 30, 12, 0, 1)
         
-        async def mock_fetch_history():
+        async def mock_fetch_history_events():
             for event in [mock_event1, mock_event2]:
                 yield event
         
         mock_handle = AsyncMock()
-        mock_handle.fetch_history = mock_fetch_history
+        mock_handle.fetch_history_events = mock_fetch_history_events
         mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         
         args = {"workflow_id": "test-workflow-123", "limit": 100}
@@ -413,10 +413,13 @@ class TestScheduleOperations:
         # Mock schedule list
         mock_schedule = MagicMock()
         mock_schedule.id = "test-schedule"
-        mock_schedule.info.paused = False
+        mock_schedule.schedule.state.paused = False
+        
+        async def mock_list_schedules_inner():
+            yield mock_schedule
         
         async def mock_list_schedules():
-            yield mock_schedule
+            return mock_list_schedules_inner()
         
         mock_client.list_schedules = mock_list_schedules
         
@@ -428,6 +431,7 @@ class TestScheduleOperations:
         response = json.loads(result[0].text)
         assert len(response["schedules"]) == 1
         assert response["schedules"][0]["schedule_id"] == "test-schedule"
+        assert response["schedules"][0]["paused"] == False
     
     @pytest.mark.asyncio
     async def test_pause_schedule_success(self, mcp_server, mock_client):

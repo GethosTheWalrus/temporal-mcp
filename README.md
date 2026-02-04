@@ -141,3 +141,25 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 - **TEMPORAL_TLS_ENABLED**: Set to `true` for remote servers, `false` for local, or omit for auto-detection
 - Replace `192.168.69.98:7233` with your actual Temporal server address
 - For local development, you can use `localhost:7233` or `host.docker.internal:7233` (when running in Docker)
+
+## Development
+
+### Running Tests
+
+Install development dependencies:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+Run the test suite:
+
+```bash
+pytest test.py -v
+```
+
+### Building the Docker Image
+
+```bash
+docker build -t mcp/temporal:latest .
+```

@@ -242,13 +242,15 @@ async def get_workflow_history(client: Client, args: dict) -> list[TextContent]:
     handle = client.get_workflow_handle(workflow_id)
     
     events = []
-    async for event in handle.fetch_history():
+    count = 0
+    async for event in handle.fetch_history_events():
         events.append({
             "event_id": event.event_id,
             "event_type": event.event_type,
             "event_time": str(event.event_time),
         })
-        if len(events) >= limit:
+        count += 1
+        if count >= limit:
             break
     
     return [TextContent(
