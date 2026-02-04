@@ -65,7 +65,7 @@ async def list_schedules(client: Client, args: dict) -> list[TextContent]:
     count = 0
     total_fetched = 0
     
-    async for schedule in client.list_schedules():
+    async for schedule in await client.list_schedules():
         # Skip the first 'skip' results
         if count < skip:
             count += 1
@@ -73,7 +73,7 @@ async def list_schedules(client: Client, args: dict) -> list[TextContent]:
             
         schedules.append({
             "schedule_id": schedule.id,
-            "state": str(schedule.info.paused) if schedule.info else "unknown",
+            "paused": schedule.schedule.state.paused if schedule.schedule else False,
         })
         count += 1
         total_fetched += 1
@@ -84,7 +84,7 @@ async def list_schedules(client: Client, args: dict) -> list[TextContent]:
     # Check if there are more results
     has_more = False
     try:
-        async for _ in client.list_schedules():
+        async for _ in await client.list_schedules():
             if count < skip + limit:
                 count += 1
                 continue
