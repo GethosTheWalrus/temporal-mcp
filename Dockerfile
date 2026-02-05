@@ -10,6 +10,11 @@ RUN apt-get update && apt-get install -y \
 
 # Copy requirements first for better caching
 COPY requirements.txt .
+
+# Upgrade pip and wheel to fix security vulnerabilities  
+# Force wheel upgrade before installing other packages
+RUN pip install --no-cache-dir --upgrade "pip>=26.0" "wheel>=0.46.2" "setuptools>=75.0"
+
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code
