@@ -2,18 +2,44 @@
 name = "temporal-mcp-server"
 version = "0.1.0"
 description = "MCP server for Temporal workflow orchestration"
+readme = "README.md"
+license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
+authors = [
+    {name = "Mike", email = "mike@miketoscano.com"},
+]
+keywords = ["temporal", "mcp", "model-context-protocol", "workflow", "orchestration"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+]
 dependencies = [
     "temporalio>=1.5.0",
     "mcp>=0.9.0",
+    "asyncio-atexit>=1.0.1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/GethosTheWalrus/temporal-mcp"
+Repository = "https://github.com/GethosTheWalrus/temporal-mcp"
+Issues = "https://github.com/GethosTheWalrus/temporal-mcp/issues"
+
+[project.scripts]
+temporal-mcp-server = "temporal_mcp.__main__:main"
 
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["temporal_mcp"]
+[tool.setuptools.packages.find]
+include = ["temporal_mcp*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
