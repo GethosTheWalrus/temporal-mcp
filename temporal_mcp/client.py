@@ -13,7 +13,10 @@ class TemporalClientManager:
         self,
         temporal_host: str = "localhost:7233",
         namespace: str = "default",
-        tls_enabled: Optional[bool] = None
+        tls_enabled: Optional[bool] = None,
+        tls_client_cert_path: Optional[str] = None,
+        tls_client_key_path: Optional[str] = None,
+        api_key: Optional[str] = None,
     ):
         """Initialize the Temporal client manager.
         
@@ -21,10 +24,16 @@ class TemporalClientManager:
             temporal_host: The Temporal server host and port
             namespace: The Temporal namespace to use
             tls_enabled: Whether to use TLS for connection (None = auto-detect, True = force enable, False = force disable)
+            tls_client_cert_path: Path to the TLS client certificate file (for mTLS / Temporal Cloud)
+            tls_client_key_path: Path to the TLS client private key file (for mTLS / Temporal Cloud)
+            api_key: API key for Temporal Cloud authentication
         """
         self.temporal_host = temporal_host
         self.namespace = namespace
         self.tls_enabled = tls_enabled
+        self.tls_client_cert_path = tls_client_cert_path
+        self.tls_client_key_path = tls_client_key_path
+        self.api_key = api_key
         self.client: Optional[Client] = None
     
     async def connect(self) -> Client:
@@ -46,6 +55,7 @@ class TemporalClientManager:
                     self.temporal_host,
                     namespace=self.namespace,
                     tls=tls_config,
+                    api_key=self.api_key if self.api_key else None,
                 )
                 print(f"Successfully connected to Temporal at {self.temporal_host}", file=sys.stderr)
             except Exception as e:
@@ -79,12 +89,56 @@ class TemporalClientManager:
             raise RuntimeError("Not connected to Temporal server. Connection may have failed or been lost.")
         return self.client
     
+    def _load_client_certs(self) -> tuple[Optional[bytes], Optional[bytes]]:
+        """Load mTLS client certificate and key from disk.
+
+        Returns:
+            Tuple of (client_cert_bytes, client_key_bytes). Both are None when
+            no certificate paths are configured.
+
+        Raises:
+            FileNotFoundError: If a configured path does not exist.
+            ValueError: If only one of cert/key is provided.
+        """
+        if not self.tls_client_cert_path and not self.tls_client_key_path:
+            return None, None
+
+        if bool(self.tls_client_cert_path) != bool(self.tls_client_key_path):
+            raise ValueError(
+                "Both TEMPORAL_TLS_CLIENT_CERT_PATH and TEMPORAL_TLS_CLIENT_KEY_PATH "
+                "must be set together for mTLS."
+            )
+
+        with open(self.tls_client_cert_path, "rb") as f:
+            client_cert = f.read()
+        with open(self.tls_client_key_path, "rb") as f:
+            client_key = f.read()
+
+        print(
+            f"Loaded mTLS client certificate from {self.tls_client_cert_path}",
+            file=sys.stderr,
+        )
+        return client_cert, client_key
+
     def _determine_tls_config(self) -> Optional[TLSConfig]:
-        """Determine TLS configuration based on settings and hostname.
+        """Determine TLS configuration based on settings, hostname, and client certs.
         
         Returns:
             TLS configuration or None
         """
+        client_cert, client_key = self._load_client_certs()
+
+        # If mTLS certs are provided, always enable TLS regardless of other settings
+        if client_cert and client_key:
+            return TLSConfig(
+                client_cert=client_cert,
+                client_private_key=client_key,
+            )
+
+        # API key auth requires TLS
+        if self.api_key:
+            return TLSConfig()
+
         # Priority: explicit tls_enabled setting > auto-detect from hostname
         if self.tls_enabled is True:
             return TLSConfig()
