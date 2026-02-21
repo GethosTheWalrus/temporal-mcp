@@ -1,12 +1,12 @@
 [project]
 name = "temporal-mcp-server"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server for Temporal workflow orchestration"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
 authors = [
-    {name = "Mike", email = "mike@miketoscano.com"},
+    {name = "Mike Toscano", email = "mike@miketoscano.com"},
 ]
 keywords = ["temporal", "mcp", "model-context-protocol", "workflow", "orchestration"]
 classifiers = [
