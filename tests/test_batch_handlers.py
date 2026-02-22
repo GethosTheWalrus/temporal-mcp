@@ -1,4 +1,5 @@
 """Tests for batch handler tools."""
+
 import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock

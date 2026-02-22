@@ -1,4 +1,5 @@
 """Tests for error handling in handler tools."""
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 

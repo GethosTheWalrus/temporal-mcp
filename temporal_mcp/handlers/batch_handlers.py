@@ -34,20 +34,11 @@ async def batch_signal(client: Client, args: dict) -> list[TextContent]:
             await handle.signal(signal_name, signal_args)
             workflows_signaled.append(workflow.id)
         except Exception as e:
-            error_detail = {
-                "workflow_id": workflow.id,
-                "error": str(e),
-                "error_type": type(e).__name__
-            }
+            error_detail = {"workflow_id": workflow.id, "error": str(e), "error_type": type(e).__name__}
             errors.append(error_detail)
             print(f"Error signaling workflow {workflow.id}: {e}", file=sys.stderr)
 
-    result = {
-        "signal_name": signal_name,
-        "workflows_signaled": workflows_signaled,
-        "success_count": len(workflows_signaled),
-        "error_count": len(errors)
-    }
+    result = {"signal_name": signal_name, "workflows_signaled": workflows_signaled, "success_count": len(workflows_signaled), "error_count": len(errors)}
 
     if errors:
         result["errors"] = errors
@@ -97,28 +88,21 @@ async def batch_cancel(client: Client, args: dict) -> list[TextContent]:
 
     # Process in batches for concurrency
     for i in range(0, len(workflows_to_cancel), concurrency):
-        batch = workflows_to_cancel[i:i + concurrency]
+        batch = workflows_to_cancel[i : i + concurrency]
         batch_num = i // concurrency + 1
         total_batches = (len(workflows_to_cancel) + concurrency - 1) // concurrency
 
         print(f"Processing batch {batch_num}/{total_batches} ({len(batch)} workflows)...", file=sys.stderr)
 
         # Cancel workflows concurrently in this batch
-        results = await asyncio.gather(
-            *[cancel_workflow(wf_id) for wf_id in batch],
-            return_exceptions=False
-        )
+        results = await asyncio.gather(*[cancel_workflow(wf_id) for wf_id in batch], return_exceptions=False)
 
         # Process results
         for workflow_id, error in results:
             if error is None:
                 workflows_cancelled.append(workflow_id)
             else:
-                error_detail = {
-                    "workflow_id": workflow_id,
-                    "error": str(error),
-                    "error_type": type(error).__name__
-                }
+                error_detail = {"workflow_id": workflow_id, "error": str(error), "error_type": type(error).__name__}
                 errors.append(error_detail)
                 print(f"Error cancelling workflow {workflow_id}: {error}", file=sys.stderr)
 
@@ -131,7 +115,7 @@ async def batch_cancel(client: Client, args: dict) -> list[TextContent]:
         "success_count": len(workflows_cancelled),
         "error_count": len(errors),
         "total_processed": len(workflows_cancelled) + len(errors),
-        "message": f"Successfully cancelled {len(workflows_cancelled)} workflows."
+        "message": f"Successfully cancelled {len(workflows_cancelled)} workflows.",
     }
 
     # Include first and last few IDs as samples only
@@ -194,28 +178,21 @@ async def batch_terminate(client: Client, args: dict) -> list[TextContent]:
 
     # Process in batches for concurrency
     for i in range(0, len(workflows_to_terminate), concurrency):
-        batch = workflows_to_terminate[i:i + concurrency]
+        batch = workflows_to_terminate[i : i + concurrency]
         batch_num = i // concurrency + 1
         total_batches = (len(workflows_to_terminate) + concurrency - 1) // concurrency
 
         print(f"Processing batch {batch_num}/{total_batches} ({len(batch)} workflows)...", file=sys.stderr)
 
         # Terminate workflows concurrently in this batch
-        results = await asyncio.gather(
-            *[terminate_workflow(wf_id) for wf_id in batch],
-            return_exceptions=False
-        )
+        results = await asyncio.gather(*[terminate_workflow(wf_id) for wf_id in batch], return_exceptions=False)
 
         # Process results
         for workflow_id, error in results:
             if error is None:
                 workflows_terminated.append(workflow_id)
             else:
-                error_detail = {
-                    "workflow_id": workflow_id,
-                    "error": str(error),
-                    "error_type": type(error).__name__
-                }
+                error_detail = {"workflow_id": workflow_id, "error": str(error), "error_type": type(error).__name__}
                 errors.append(error_detail)
                 print(f"Error terminating workflow {workflow_id}: {error}", file=sys.stderr)
 
@@ -229,7 +206,7 @@ async def batch_terminate(client: Client, args: dict) -> list[TextContent]:
         "success_count": len(workflows_terminated),
         "error_count": len(errors),
         "total_processed": len(workflows_terminated) + len(errors),
-        "message": f"Successfully terminated {len(workflows_terminated)} workflows."
+        "message": f"Successfully terminated {len(workflows_terminated)} workflows.",
     }
 
     # Include first and last few IDs as samples only

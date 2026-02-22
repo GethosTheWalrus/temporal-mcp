@@ -1,4 +1,5 @@
 """Tests for schedule handler tools."""
+
 import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock

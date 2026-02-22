@@ -22,13 +22,7 @@ def format_connection_error(error: Exception) -> list[TextContent]:
     """
     error_msg = f"Failed to connect to Temporal server: {type(error).__name__}: {str(error)}"
     print(error_msg, file=sys.stderr)
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "error": error_msg,
-            "type": "connection_error"
-        }, indent=2)
-    )]
+    return [TextContent(type="text", text=json.dumps({"error": error_msg, "type": "connection_error"}, indent=2))]
 
 
 def format_error_response(error: Exception, tool_name: str) -> list[TextContent]:
@@ -65,14 +59,7 @@ def _format_key_error(error: KeyError, tool_name: str) -> list[TextContent]:
     """
     error_msg = f"Missing required parameter: {str(error)}"
     print(f"KeyError in {tool_name}: {error_msg}", file=sys.stderr)
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "error": error_msg,
-            "type": "missing_parameter",
-            "tool": tool_name
-        }, indent=2)
-    )]
+    return [TextContent(type="text", text=json.dumps({"error": error_msg, "type": "missing_parameter", "tool": tool_name}, indent=2))]
 
 
 def _format_rpc_error(error: RPCError, tool_name: str) -> list[TextContent]:
@@ -96,14 +83,7 @@ def _format_rpc_error(error: RPCError, tool_name: str) -> list[TextContent]:
         error_msg = f"Resource already exists: {str(error)}"
 
     print(f"RPCError in {tool_name}: {error_msg}", file=sys.stderr)
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "error": error_msg,
-            "type": error_type,
-            "tool": tool_name
-        }, indent=2)
-    )]
+    return [TextContent(type="text", text=json.dumps({"error": error_msg, "type": error_type, "tool": tool_name}, indent=2))]
 
 
 def _format_workflow_already_started_error(tool_name: str) -> list[TextContent]:
@@ -115,14 +95,7 @@ def _format_workflow_already_started_error(tool_name: str) -> list[TextContent]:
     Returns:
         Formatted error response
     """
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "error": "Workflow with this ID already exists",
-            "type": "workflow_already_started",
-            "tool": tool_name
-        }, indent=2)
-    )]
+    return [TextContent(type="text", text=json.dumps({"error": "Workflow with this ID already exists", "type": "workflow_already_started", "tool": tool_name}, indent=2))]
 
 
 def _format_schedule_already_exists_error(tool_name: str) -> list[TextContent]:
@@ -134,14 +107,7 @@ def _format_schedule_already_exists_error(tool_name: str) -> list[TextContent]:
     Returns:
         Formatted error response
     """
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "error": "Schedule with this ID already exists",
-            "type": "schedule_already_exists",
-            "tool": tool_name
-        }, indent=2)
-    )]
+    return [TextContent(type="text", text=json.dumps({"error": "Schedule with this ID already exists", "type": "schedule_already_exists", "tool": tool_name}, indent=2))]
 
 
 def _format_generic_error(error: Exception, tool_name: str) -> list[TextContent]:
@@ -157,11 +123,4 @@ def _format_generic_error(error: Exception, tool_name: str) -> list[TextContent]
     error_msg = f"Error executing {tool_name}: {type(error).__name__}: {str(error)}"
     print(error_msg, file=sys.stderr)
     traceback.print_exc(file=sys.stderr)
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "error": str(error),
-            "error_type": type(error).__name__,
-            "tool": tool_name
-        }, indent=2)
-    )]
+    return [TextContent(type="text", text=json.dumps({"error": str(error), "error_type": type(error).__name__, "tool": tool_name}, indent=2))]

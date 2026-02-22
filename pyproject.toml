@@ -54,6 +54,10 @@ ignore_missing_imports = true
 warn_unused_ignores = true
 warn_return_any = true
 
+[tool.black]
+line-length = 200
+target-version = ["py310"]
+
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
 branch = "main"

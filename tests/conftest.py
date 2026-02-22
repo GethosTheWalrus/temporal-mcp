@@ -1,4 +1,5 @@
 """Shared fixtures for the Temporal MCP test suite."""
+
 import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock

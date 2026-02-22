@@ -23,10 +23,7 @@ async def query_workflow(client: Client, args: dict) -> list[TextContent]:
     handle = client.get_workflow_handle(workflow_id)
     result = await handle.query(query_name, query_args)
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({"query_result": result}, indent=2, default=str)
-    )]
+    return [TextContent(type="text", text=json.dumps({"query_result": result}, indent=2, default=str))]
 
 
 async def signal_workflow(client: Client, args: dict) -> list[TextContent]:
@@ -46,14 +43,7 @@ async def signal_workflow(client: Client, args: dict) -> list[TextContent]:
     handle = client.get_workflow_handle(workflow_id)
     await handle.signal(signal_name, signal_args)
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "status": "signal_sent",
-            "workflow_id": workflow_id,
-            "signal_name": signal_name
-        }, indent=2)
-    )]
+    return [TextContent(type="text", text=json.dumps({"status": "signal_sent", "workflow_id": workflow_id, "signal_name": signal_name}, indent=2))]
 
 
 async def continue_as_new(client: Client, args: dict) -> list[TextContent]:
@@ -76,12 +66,9 @@ async def continue_as_new(client: Client, args: dict) -> list[TextContent]:
     handle = client.get_workflow_handle(workflow_id)
     await handle.signal(signal_name, signal_args)
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "status": "signal_sent",
-            "workflow_id": workflow_id,
-            "signal_name": signal_name,
-            "note": "Workflow must implement continue-as-new logic in signal handler"
-        }, indent=2)
-    )]
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps({"status": "signal_sent", "workflow_id": workflow_id, "signal_name": signal_name, "note": "Workflow must implement continue-as-new logic in signal handler"}, indent=2),
+        )
+    ]

@@ -1,4 +1,5 @@
 """Tests for TemporalClientManager — TLS, mTLS, and API key auth."""
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from temporalio.client import TLSConfig
@@ -89,9 +90,7 @@ class TestDetermineTlsConfig:
         assert isinstance(tls, TLSConfig)
 
     def test_explicit_false_disables_tls(self):
-        tls = TemporalClientManager(
-            temporal_host="my-namespace.tmprl.cloud:7233", tls_enabled=False
-        )._determine_tls_config()
+        tls = TemporalClientManager(temporal_host="my-namespace.tmprl.cloud:7233", tls_enabled=False)._determine_tls_config()
         assert tls is None
 
     def test_auto_detect_remote_enables_tls(self):

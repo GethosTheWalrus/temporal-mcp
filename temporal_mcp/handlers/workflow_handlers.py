@@ -31,11 +31,7 @@ async def start_workflow(client: Client, args: dict) -> list[TextContent]:
         task_queue=task_queue,
     )
 
-    result = {
-        "workflow_id": handle.id,
-        "run_id": handle.result_run_id,
-        "status": "started"
-    }
+    result = {"workflow_id": handle.id, "run_id": handle.result_run_id, "status": "started"}
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
 
@@ -54,10 +50,7 @@ async def cancel_workflow(client: Client, args: dict) -> list[TextContent]:
     handle = client.get_workflow_handle(workflow_id)
     await handle.cancel()
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({"status": "cancelled", "workflow_id": workflow_id}, indent=2)
-    )]
+    return [TextContent(type="text", text=json.dumps({"status": "cancelled", "workflow_id": workflow_id}, indent=2))]
 
 
 async def terminate_workflow(client: Client, args: dict) -> list[TextContent]:
@@ -76,14 +69,7 @@ async def terminate_workflow(client: Client, args: dict) -> list[TextContent]:
     handle = client.get_workflow_handle(workflow_id)
     await handle.terminate(reason)
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "status": "terminated",
-            "workflow_id": workflow_id,
-            "reason": reason
-        }, indent=2)
-    )]
+    return [TextContent(type="text", text=json.dumps({"status": "terminated", "workflow_id": workflow_id, "reason": reason}, indent=2))]
 
 
 async def get_workflow_result(client: Client, args: dict) -> list[TextContent]:
@@ -107,23 +93,22 @@ async def get_workflow_result(client: Client, args: dict) -> list[TextContent]:
         else:
             result = await handle.result()
 
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "result": result,
-                "workflow_id": workflow_id
-            }, indent=2, default=str)
-        )]
+        return [TextContent(type="text", text=json.dumps({"result": result, "workflow_id": workflow_id}, indent=2, default=str))]
     except asyncio.TimeoutError:
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "error": f"Timeout waiting for workflow result after {timeout} seconds",
-                "type": "timeout",
-                "workflow_id": workflow_id,
-                "note": "Workflow may still be running. Use describe_workflow to check status."
-            }, indent=2)
-        )]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "error": f"Timeout waiting for workflow result after {timeout} seconds",
+                        "type": "timeout",
+                        "workflow_id": workflow_id,
+                        "note": "Workflow may still be running. Use describe_workflow to check status.",
+                    },
+                    indent=2,
+                ),
+            )
+        ]
 
 
 async def describe_workflow(client: Client, args: dict) -> list[TextContent]:
@@ -141,7 +126,7 @@ async def describe_workflow(client: Client, args: dict) -> list[TextContent]:
     handle = client.get_workflow_handle(workflow_id)
     description = await handle.describe()
 
-    status_name = WorkflowExecutionStatus.Name(int(description.status)) if description.status is not None else "UNKNOWN"  # type: ignore[arg-type]
+    status_name = WorkflowExecutionStatus.Name(int(description.status)) if description.status is not None else "UNKNOWN"
 
     info = {
         "workflow_id": description.id,
@@ -181,14 +166,16 @@ async def list_workflows(client: Client, args: dict) -> list[TextContent]:
             count += 1
             continue
 
-        workflows.append({
-            "workflow_id": workflow.id,
-            "run_id": workflow.run_id,
-            "workflow_type": workflow.workflow_type,
-            "status": WorkflowExecutionStatus.Name(int(workflow.status)) if workflow.status is not None else "UNKNOWN",  # type: ignore[arg-type]
-            "status_code": workflow.status,
-            "start_time": str(workflow.start_time),
-        })
+        workflows.append(
+            {
+                "workflow_id": workflow.id,
+                "run_id": workflow.run_id,
+                "workflow_type": workflow.workflow_type,
+                "status": WorkflowExecutionStatus.Name(int(workflow.status)) if workflow.status is not None else "UNKNOWN",
+                "status_code": workflow.status,
+                "start_time": str(workflow.start_time),
+            }
+        )
         count += 1
         total_fetched += 1
 
@@ -207,12 +194,7 @@ async def list_workflows(client: Client, args: dict) -> list[TextContent]:
     except Exception as e:
         print(f"Warning: Error checking for more workflows: {e}", file=sys.stderr)
 
-    result = {
-        "workflows": workflows,
-        "count": len(workflows),
-        "skip": skip,
-        "limit": limit
-    }
+    result = {"workflows": workflows, "count": len(workflows), "skip": skip, "limit": limit}
 
     if has_more:
         result["has_more"] = True
@@ -243,20 +225,15 @@ async def get_workflow_history(client: Client, args: dict) -> list[TextContent]:
     events = []
     count = 0
     async for event in handle.fetch_history_events():
-        events.append({
-            "event_id": event.event_id,
-            "event_type": event.event_type,
-            "event_time": str(event.event_time),
-        })
+        events.append(
+            {
+                "event_id": event.event_id,
+                "event_type": event.event_type,
+                "event_time": str(event.event_time),
+            }
+        )
         count += 1
         if count >= limit:
             break
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "workflow_id": workflow_id,
-            "events": events,
-            "count": len(events)
-        }, indent=2)
-    )]
+    return [TextContent(type="text", text=json.dumps({"workflow_id": workflow_id, "events": events, "count": len(events)}, indent=2))]

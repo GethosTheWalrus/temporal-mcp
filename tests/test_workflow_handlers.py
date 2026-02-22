@@ -1,4 +1,5 @@
 """Tests for workflow handler tools."""
+
 import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock
@@ -125,9 +126,7 @@ class TestListWorkflows:
 
         mock_client.list_workflows = mock_list_workflows
 
-        result = await workflow_handlers.list_workflows(
-            mock_client, {"query": "WorkflowType='TestWorkflow'", "limit": 10}
-        )
+        result = await workflow_handlers.list_workflows(mock_client, {"query": "WorkflowType='TestWorkflow'", "limit": 10})
 
         assert len(result) == 1
         response = json.loads(result[0].text)
@@ -157,9 +156,7 @@ class TestGetWorkflowHistory:
         mock_handle.fetch_history_events = mock_fetch_history_events
         mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
 
-        result = await workflow_handlers.get_workflow_history(
-            mock_client, {"workflow_id": "test-workflow-123", "limit": 100}
-        )
+        result = await workflow_handlers.get_workflow_history(mock_client, {"workflow_id": "test-workflow-123", "limit": 100})
 
         assert len(result) == 1
         response = json.loads(result[0].text)

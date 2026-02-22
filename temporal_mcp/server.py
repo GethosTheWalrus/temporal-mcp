@@ -119,13 +119,7 @@ class TemporalMCPServer:
                     return await schedule_handlers.trigger_schedule(client, arguments)
 
                 else:
-                    return [TextContent(
-                        type="text",
-                        text=json.dumps({
-                            "error": f"Unknown tool: {name}",
-                            "type": "unknown_tool"
-                        }, indent=2)
-                    )]
+                    return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}", "type": "unknown_tool"}, indent=2))]
 
             except Exception as e:
                 return format_error_response(e, name)
@@ -134,10 +128,6 @@ class TemporalMCPServer:
         """Run the MCP server."""
         try:
             async with stdio_server() as (read_stream, write_stream):
-                await self.server.run(
-                    read_stream,
-                    write_stream,
-                    self.server.create_initialization_options()
-                )
+                await self.server.run(read_stream, write_stream, self.server.create_initialization_options())
         finally:
             await self.client_manager.disconnect()

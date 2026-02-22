@@ -61,6 +61,7 @@ class TemporalClientManager:
             except Exception as e:
                 print(f"Failed to connect to Temporal at {self.temporal_host}: {type(e).__name__}: {e}", file=sys.stderr)
                 import traceback
+
                 traceback.print_exc(file=sys.stderr)
                 raise
 
@@ -104,10 +105,7 @@ class TemporalClientManager:
             return None, None
 
         if bool(self.tls_client_cert_path) != bool(self.tls_client_key_path):
-            raise ValueError(
-                "Both TEMPORAL_TLS_CLIENT_CERT_PATH and TEMPORAL_TLS_CLIENT_KEY_PATH "
-                "must be set together for mTLS."
-            )
+            raise ValueError("Both TEMPORAL_TLS_CLIENT_CERT_PATH and TEMPORAL_TLS_CLIENT_KEY_PATH " "must be set together for mTLS.")
 
         assert self.tls_client_cert_path is not None
         assert self.tls_client_key_path is not None
