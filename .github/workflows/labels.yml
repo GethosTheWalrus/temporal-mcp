@@ -14,5 +14,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh label create dependencies --color 0075ca --description 'Dependency updates' --force
-          gh label create ci --color e4e669 --description 'CI/CD changes' --force
+          gh label create dependencies --color 0075ca --description 'Dependency updates' --force --repo ${{ github.repository }}
+          gh label create ci --color e4e669 --description 'CI/CD changes' --force --repo ${{ github.repository }}
