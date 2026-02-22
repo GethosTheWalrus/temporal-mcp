@@ -3,8 +3,10 @@ import asyncio
 import json
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 from datetime import datetime
+from temporalio.client import TLSConfig
+from temporal_mcp.client import TemporalClientManager
 from temporal_mcp.server import TemporalMCPServer
 from temporal_mcp.handlers import workflow_handlers, query_handlers, batch_handlers, schedule_handlers
 @pytest_asyncio.fixture
@@ -21,6 +23,247 @@ def mock_client():
     """Create a mock Temporal client."""
     client = AsyncMock()
     return client
+
+
+class TestTemporalClientManager:
+    """Tests for TemporalClientManager — TLS, mTLS and API key auth."""
+
+    # ------------------------------------------------------------------
+    # _is_remote_host
+    # ------------------------------------------------------------------
+    def test_is_remote_host_localhost(self):
+        mgr = TemporalClientManager(temporal_host="localhost:7233")
+        assert mgr._is_remote_host() is False
+
+    def test_is_remote_host_127(self):
+        mgr = TemporalClientManager(temporal_host="127.0.0.1:7233")
+        assert mgr._is_remote_host() is False
+
+    def test_is_remote_host_docker_internal(self):
+        mgr = TemporalClientManager(temporal_host="host.docker.internal:7233")
+        assert mgr._is_remote_host() is False
+
+    def test_is_remote_host_cloud(self):
+        mgr = TemporalClientManager(
+            temporal_host="my-namespace.tmprl.cloud:7233"
+        )
+        assert mgr._is_remote_host() is True
+
+    # ------------------------------------------------------------------
+    # _load_client_certs
+    # ------------------------------------------------------------------
+    def test_load_client_certs_no_paths(self):
+        mgr = TemporalClientManager()
+        cert, key = mgr._load_client_certs()
+        assert cert is None
+        assert key is None
+
+    def test_load_client_certs_only_cert_raises(self):
+        mgr = TemporalClientManager(tls_client_cert_path="/path/to/cert.pem")
+        with pytest.raises(ValueError, match="must be set together"):
+            mgr._load_client_certs()
+
+    def test_load_client_certs_only_key_raises(self):
+        mgr = TemporalClientManager(tls_client_key_path="/path/to/key.pem")
+        with pytest.raises(ValueError, match="must be set together"):
+            mgr._load_client_certs()
+
+    def test_load_client_certs_both_paths(self, tmp_path):
+        cert_file = tmp_path / "client.pem"
+        key_file = tmp_path / "client.key"
+        cert_file.write_bytes(b"CERT_DATA")
+        key_file.write_bytes(b"KEY_DATA")
+
+        mgr = TemporalClientManager(
+            tls_client_cert_path=str(cert_file),
+            tls_client_key_path=str(key_file),
+        )
+        cert, key = mgr._load_client_certs()
+        assert cert == b"CERT_DATA"
+        assert key == b"KEY_DATA"
+
+    def test_load_client_certs_missing_file_raises(self, tmp_path):
+        key_file = tmp_path / "client.key"
+        key_file.write_bytes(b"KEY_DATA")
+
+        mgr = TemporalClientManager(
+            tls_client_cert_path="/nonexistent/cert.pem",
+            tls_client_key_path=str(key_file),
+        )
+        with pytest.raises(FileNotFoundError):
+            mgr._load_client_certs()
+
+    # ------------------------------------------------------------------
+    # _determine_tls_config
+    # ------------------------------------------------------------------
+    def test_determine_tls_config_mtls(self, tmp_path):
+        """mTLS certs → TLSConfig with client_cert and client_private_key."""
+        cert_file = tmp_path / "client.pem"
+        key_file = tmp_path / "client.key"
+        cert_file.write_bytes(b"CERT")
+        key_file.write_bytes(b"KEY")
+
+        mgr = TemporalClientManager(
+            tls_client_cert_path=str(cert_file),
+            tls_client_key_path=str(key_file),
+        )
+        tls = mgr._determine_tls_config()
+        assert isinstance(tls, TLSConfig)
+        assert tls.client_cert == b"CERT"
+        assert tls.client_private_key == b"KEY"
+
+    def test_determine_tls_config_api_key(self):
+        """API key auth → TLSConfig() (plain TLS, no client certs)."""
+        mgr = TemporalClientManager(api_key="my-secret-key")
+        tls = mgr._determine_tls_config()
+        assert isinstance(tls, TLSConfig)
+        assert tls.client_cert is None
+        assert tls.client_private_key is None
+
+    def test_determine_tls_config_explicit_true(self):
+        """tls_enabled=True → TLSConfig()."""
+        mgr = TemporalClientManager(
+            temporal_host="localhost:7233", tls_enabled=True
+        )
+        tls = mgr._determine_tls_config()
+        assert isinstance(tls, TLSConfig)
+
+    def test_determine_tls_config_explicit_false(self):
+        """tls_enabled=False → None, even for remote host."""
+        mgr = TemporalClientManager(
+            temporal_host="my-namespace.tmprl.cloud:7233", tls_enabled=False
+        )
+        tls = mgr._determine_tls_config()
+        assert tls is None
+
+    def test_determine_tls_config_auto_detect_remote(self):
+        """Auto-detect remote host → TLSConfig()."""
+        mgr = TemporalClientManager(
+            temporal_host="my-namespace.tmprl.cloud:7233"
+        )
+        tls = mgr._determine_tls_config()
+        assert isinstance(tls, TLSConfig)
+
+    def test_determine_tls_config_auto_detect_local(self):
+        """Auto-detect local host → None."""
+        mgr = TemporalClientManager(temporal_host="localhost:7233")
+        tls = mgr._determine_tls_config()
+        assert tls is None
+
+    # ------------------------------------------------------------------
+    # connect / disconnect / ensure_connected
+    # ------------------------------------------------------------------
+    @pytest.mark.asyncio
+    async def test_connect_success(self):
+        """connect() should store the client and return it."""
+        mgr = TemporalClientManager(temporal_host="localhost:7233")
+        mock_client = AsyncMock()
+
+        with patch("temporal_mcp.client.Client.connect", return_value=mock_client):
+            client = await mgr.connect()
+
+        assert client is mock_client
+        assert mgr.client is mock_client
+
+    @pytest.mark.asyncio
+    async def test_connect_reuses_existing_client(self):
+        """Calling connect() twice should not open a second connection."""
+        mgr = TemporalClientManager()
+        mock_client = AsyncMock()
+
+        with patch(
+            "temporal_mcp.client.Client.connect", return_value=mock_client
+        ) as mock_connect:
+            await mgr.connect()
+            await mgr.connect()
+            mock_connect.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_connect_failure_raises(self):
+        """connect() should propagate exceptions from Client.connect."""
+        mgr = TemporalClientManager()
+
+        with patch(
+            "temporal_mcp.client.Client.connect",
+            side_effect=Exception("connection refused"),
+        ):
+            with pytest.raises(Exception, match="connection refused"):
+                await mgr.connect()
+
+    @pytest.mark.asyncio
+    async def test_connect_with_api_key_passes_key(self):
+        """connect() should forward api_key to Client.connect."""
+        mgr = TemporalClientManager(
+            temporal_host="my-namespace.tmprl.cloud:7233",
+            api_key="tok_abc123",
+        )
+        mock_client = AsyncMock()
+
+        with patch(
+            "temporal_mcp.client.Client.connect", return_value=mock_client
+        ) as mock_connect:
+            await mgr.connect()
+            _, kwargs = mock_connect.call_args
+            assert kwargs.get("api_key") == "tok_abc123"
+            assert isinstance(kwargs.get("tls"), TLSConfig)
+
+    @pytest.mark.asyncio
+    async def test_connect_with_mtls_passes_tls_config(self, tmp_path):
+        """connect() should pass a TLSConfig with client certs for mTLS."""
+        cert_file = tmp_path / "client.pem"
+        key_file = tmp_path / "client.key"
+        cert_file.write_bytes(b"CERT")
+        key_file.write_bytes(b"KEY")
+
+        mgr = TemporalClientManager(
+            temporal_host="my-namespace.tmprl.cloud:7233",
+            tls_client_cert_path=str(cert_file),
+            tls_client_key_path=str(key_file),
+        )
+        mock_client = AsyncMock()
+
+        with patch(
+            "temporal_mcp.client.Client.connect", return_value=mock_client
+        ) as mock_connect:
+            await mgr.connect()
+            _, kwargs = mock_connect.call_args
+            tls = kwargs.get("tls")
+            assert isinstance(tls, TLSConfig)
+            assert tls.client_cert == b"CERT"
+            assert tls.client_private_key == b"KEY"
+
+    @pytest.mark.asyncio
+    async def test_disconnect_closes_client(self):
+        """disconnect() should close the client and set it to None."""
+        mgr = TemporalClientManager()
+        mock_client = AsyncMock()
+        mgr.client = mock_client
+
+        await mgr.disconnect()
+
+        mock_client.close.assert_called_once()
+        assert mgr.client is None
+
+    @pytest.mark.asyncio
+    async def test_disconnect_when_not_connected(self):
+        """disconnect() should be a no-op when there is no active client."""
+        mgr = TemporalClientManager()
+        # Should not raise
+        await mgr.disconnect()
+
+    def test_ensure_connected_returns_client(self):
+        """ensure_connected() returns client when already connected."""
+        mgr = TemporalClientManager()
+        mock_client = MagicMock()
+        mgr.client = mock_client
+
+        assert mgr.ensure_connected() is mock_client
+
+    def test_ensure_connected_raises_when_not_connected(self):
+        """ensure_connected() raises RuntimeError when not connected."""
+        mgr = TemporalClientManager()
+        with pytest.raises(RuntimeError, match="Not connected"):
+            mgr.ensure_connected()
 
 
 class TestStartWorkflow:
