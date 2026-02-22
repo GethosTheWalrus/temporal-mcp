@@ -2,8 +2,8 @@ name: Publish to PyPI
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v*"
 
 jobs:
   publish:
@@ -25,30 +25,8 @@ jobs:
       - name: Install build tools
         run: pip install build
 
-      - name: Read package version
-        id: pkg_version
-        run: |
-          VERSION=$(python -c "import tomllib; f=open('pyproject.toml','rb'); d=tomllib.load(f); print(d['project']['version'])")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Check if version already exists on PyPI
-        id: version_check
-        run: |
-          PACKAGE="temporal-mcp-server"
-          VERSION="${{ steps.pkg_version.outputs.version }}"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$PACKAGE/$VERSION/json")
-          if [ "$STATUS" = "200" ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Version $VERSION already exists on PyPI — skipping publish."
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "Version $VERSION not found on PyPI — will publish."
-          fi
-
       - name: Build package
-        if: steps.version_check.outputs.exists == 'false'
         run: python -m build
 
       - name: Publish to PyPI
-        if: steps.version_check.outputs.exists == 'false'
         uses: pypa/gh-action-pypi-publish@release/v1

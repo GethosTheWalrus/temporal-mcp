@@ -1,6 +1,6 @@
 [project]
 name = "temporal-mcp-server"
-version = "0.2.0"
+version = "1.0.0"
 description = "MCP server for Temporal workflow orchestration"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -47,3 +47,20 @@ testpaths = ["tests"]
 filterwarnings = [
     "ignore::pytest.PytestAssertRewriteWarning"
 ]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_return_any = true
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+branch = "main"
+build_command = false
+
+[tool.semantic_release.remote]
+type = "github"
+
+[tool.semantic_release.publish]
+upload_to_vcs_release = true

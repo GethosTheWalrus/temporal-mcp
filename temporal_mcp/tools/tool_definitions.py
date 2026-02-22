@@ -5,7 +5,7 @@ from mcp.types import Tool
 
 def get_all_tools() -> list[Tool]:
     """Get all available Temporal tools.
-    
+
     Returns:
         List of Tool definitions
     """

@@ -2,7 +2,6 @@
 
 import json
 import sys
-from typing import Any
 
 from mcp.types import TextContent
 from temporalio.client import Client, Schedule, ScheduleActionStartWorkflow, ScheduleSpec
@@ -10,11 +9,11 @@ from temporalio.client import Client, Schedule, ScheduleActionStartWorkflow, Sch
 
 async def create_schedule(client: Client, args: dict) -> list[TextContent]:
     """Create a new workflow schedule.
-    
+
     Args:
         client: Connected Temporal client
         args: Arguments containing schedule_id, workflow_name, task_queue, cron, and optional args
-        
+
     Returns:
         Success response with schedule details
     """
@@ -36,7 +35,7 @@ async def create_schedule(client: Client, args: dict) -> list[TextContent]:
             spec=ScheduleSpec(cron_expressions=[cron]),
         ),
     )
-    
+
     return [TextContent(
         type="text",
         text=json.dumps({
@@ -50,11 +49,11 @@ async def create_schedule(client: Client, args: dict) -> list[TextContent]:
 
 async def list_schedules(client: Client, args: dict) -> list[TextContent]:
     """List all schedules with skip-based pagination.
-    
+
     Args:
         client: Connected Temporal client
         args: Arguments containing optional limit and skip
-        
+
     Returns:
         List of schedules with pagination info
     """
@@ -64,23 +63,23 @@ async def list_schedules(client: Client, args: dict) -> list[TextContent]:
     schedules = []
     count = 0
     total_fetched = 0
-    
+
     async for schedule in await client.list_schedules():
         # Skip the first 'skip' results
         if count < skip:
             count += 1
             continue
-            
+
         schedules.append({
             "schedule_id": schedule.id,
             "paused": schedule.schedule.state.paused if schedule.schedule else False,
         })
         count += 1
         total_fetched += 1
-        
+
         if total_fetched >= limit:
             break
-    
+
     # Check if there are more results
     has_more = False
     try:
@@ -92,14 +91,14 @@ async def list_schedules(client: Client, args: dict) -> list[TextContent]:
             break
     except Exception as e:
         print(f"Warning: Error checking for more schedules: {e}", file=sys.stderr)
-    
+
     result = {
         "schedules": schedules,
         "count": len(schedules),
         "skip": skip,
         "limit": limit
     }
-    
+
     if has_more:
         result["has_more"] = True
         result["next_skip"] = skip + limit
@@ -107,17 +106,17 @@ async def list_schedules(client: Client, args: dict) -> list[TextContent]:
     else:
         result["has_more"] = False
         result["message"] = f"Showing all {len(schedules)} schedules (skipped {skip}). No more results."
-    
+
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
 
 async def pause_schedule(client: Client, args: dict) -> list[TextContent]:
     """Pause a schedule.
-    
+
     Args:
         client: Connected Temporal client
         args: Arguments containing schedule_id and optional note
-        
+
     Returns:
         Success response
     """
@@ -126,7 +125,7 @@ async def pause_schedule(client: Client, args: dict) -> list[TextContent]:
 
     handle = client.get_schedule_handle(schedule_id)
     await handle.pause(note=note)
-    
+
     return [TextContent(
         type="text",
         text=json.dumps({
@@ -139,11 +138,11 @@ async def pause_schedule(client: Client, args: dict) -> list[TextContent]:
 
 async def unpause_schedule(client: Client, args: dict) -> list[TextContent]:
     """Resume a paused schedule.
-    
+
     Args:
         client: Connected Temporal client
         args: Arguments containing schedule_id and optional note
-        
+
     Returns:
         Success response
     """
@@ -152,7 +151,7 @@ async def unpause_schedule(client: Client, args: dict) -> list[TextContent]:
 
     handle = client.get_schedule_handle(schedule_id)
     await handle.unpause(note=note)
-    
+
     return [TextContent(
         type="text",
         text=json.dumps({
@@ -165,11 +164,11 @@ async def unpause_schedule(client: Client, args: dict) -> list[TextContent]:
 
 async def delete_schedule(client: Client, args: dict) -> list[TextContent]:
     """Delete a schedule.
-    
+
     Args:
         client: Connected Temporal client
         args: Arguments containing schedule_id
-        
+
     Returns:
         Success response
     """
@@ -177,7 +176,7 @@ async def delete_schedule(client: Client, args: dict) -> list[TextContent]:
 
     handle = client.get_schedule_handle(schedule_id)
     await handle.delete()
-    
+
     return [TextContent(
         type="text",
         text=json.dumps({
@@ -189,11 +188,11 @@ async def delete_schedule(client: Client, args: dict) -> list[TextContent]:
 
 async def trigger_schedule(client: Client, args: dict) -> list[TextContent]:
     """Manually trigger a schedule.
-    
+
     Args:
         client: Connected Temporal client
         args: Arguments containing schedule_id
-        
+
     Returns:
         Success response
     """
@@ -201,7 +200,7 @@ async def trigger_schedule(client: Client, args: dict) -> list[TextContent]:
 
     handle = client.get_schedule_handle(schedule_id)
     await handle.trigger()
-    
+
     return [TextContent(
         type="text",
         text=json.dumps({

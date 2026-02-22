@@ -31,7 +31,7 @@ class TemporalMCPServer:
         api_key: Optional[str] = None,
     ):
         """Initialize the Temporal MCP server.
-        
+
         Args:
             temporal_host: The Temporal server host and port
             namespace: The Temporal namespace to use
@@ -53,7 +53,7 @@ class TemporalMCPServer:
 
     def _setup_handlers(self):
         """Set up MCP request handlers."""
-        
+
         @self.server.list_tools()
         async def list_tools() -> list[Tool]:
             """List available Temporal tools."""
@@ -67,11 +67,11 @@ class TemporalMCPServer:
                 await self.client_manager.connect()
             except Exception as e:
                 return format_connection_error(e)
-            
+
             # Route to appropriate handler
             try:
                 client = self.client_manager.ensure_connected()
-                
+
                 # Workflow operations
                 if name == "start_workflow":
                     return await workflow_handlers.start_workflow(client, arguments)
@@ -87,7 +87,7 @@ class TemporalMCPServer:
                     return await workflow_handlers.list_workflows(client, arguments)
                 elif name == "get_workflow_history":
                     return await workflow_handlers.get_workflow_history(client, arguments)
-                
+
                 # Query and signal operations
                 elif name == "query_workflow":
                     return await query_handlers.query_workflow(client, arguments)
@@ -95,7 +95,7 @@ class TemporalMCPServer:
                     return await query_handlers.signal_workflow(client, arguments)
                 elif name == "continue_as_new":
                     return await query_handlers.continue_as_new(client, arguments)
-                
+
                 # Batch operations
                 elif name == "batch_signal":
                     return await batch_handlers.batch_signal(client, arguments)
@@ -103,7 +103,7 @@ class TemporalMCPServer:
                     return await batch_handlers.batch_cancel(client, arguments)
                 elif name == "batch_terminate":
                     return await batch_handlers.batch_terminate(client, arguments)
-                
+
                 # Schedule operations
                 elif name == "create_schedule":
                     return await schedule_handlers.create_schedule(client, arguments)
@@ -117,7 +117,7 @@ class TemporalMCPServer:
                     return await schedule_handlers.delete_schedule(client, arguments)
                 elif name == "trigger_schedule":
                     return await schedule_handlers.trigger_schedule(client, arguments)
-                
+
                 else:
                     return [TextContent(
                         type="text",
@@ -126,7 +126,7 @@ class TemporalMCPServer:
                             "type": "unknown_tool"
                         }, indent=2)
                     )]
-            
+
             except Exception as e:
                 return format_error_response(e, name)
 
