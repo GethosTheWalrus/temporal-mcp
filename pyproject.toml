@@ -1,6 +1,6 @@
 [project]
 name = "temporal-mcp-server"
-version = "1.0.0"
+version = "0.2.0"
 description = "MCP server for Temporal workflow orchestration"
 readme = "README.md"
 license = {text = "Apache-2.0"}
