@@ -25,26 +25,35 @@ class TemporalMCPServer:
         self,
         temporal_host: str = "localhost:7233",
         namespace: str = "default",
-        tls_enabled: Optional[bool] = None
+        tls_enabled: Optional[bool] = None,
+        tls_client_cert_path: Optional[str] = None,
+        tls_client_key_path: Optional[str] = None,
+        api_key: Optional[str] = None,
     ):
         """Initialize the Temporal MCP server.
-        
+
         Args:
             temporal_host: The Temporal server host and port
             namespace: The Temporal namespace to use
             tls_enabled: Whether to use TLS for connection (None = auto-detect, True = force enable, False = force disable)
+            tls_client_cert_path: Path to the TLS client certificate file (for mTLS / Temporal Cloud)
+            tls_client_key_path: Path to the TLS client private key file (for mTLS / Temporal Cloud)
+            api_key: API key for Temporal Cloud authentication
         """
         self.client_manager = TemporalClientManager(
             temporal_host=temporal_host,
             namespace=namespace,
-            tls_enabled=tls_enabled
+            tls_enabled=tls_enabled,
+            tls_client_cert_path=tls_client_cert_path,
+            tls_client_key_path=tls_client_key_path,
+            api_key=api_key,
         )
         self.server = Server("temporal-mcp-server")
         self._setup_handlers()
 
     def _setup_handlers(self):
         """Set up MCP request handlers."""
-        
+
         @self.server.list_tools()
         async def list_tools() -> list[Tool]:
             """List available Temporal tools."""
@@ -58,11 +67,11 @@ class TemporalMCPServer:
                 await self.client_manager.connect()
             except Exception as e:
                 return format_connection_error(e)
-            
+
             # Route to appropriate handler
             try:
                 client = self.client_manager.ensure_connected()
-                
+
                 # Workflow operations
                 if name == "start_workflow":
                     return await workflow_handlers.start_workflow(client, arguments)
@@ -78,7 +87,7 @@ class TemporalMCPServer:
                     return await workflow_handlers.list_workflows(client, arguments)
                 elif name == "get_workflow_history":
                     return await workflow_handlers.get_workflow_history(client, arguments)
-                
+
                 # Query and signal operations
                 elif name == "query_workflow":
                     return await query_handlers.query_workflow(client, arguments)
@@ -86,7 +95,7 @@ class TemporalMCPServer:
                     return await query_handlers.signal_workflow(client, arguments)
                 elif name == "continue_as_new":
                     return await query_handlers.continue_as_new(client, arguments)
-                
+
                 # Batch operations
                 elif name == "batch_signal":
                     return await batch_handlers.batch_signal(client, arguments)
@@ -94,7 +103,7 @@ class TemporalMCPServer:
                     return await batch_handlers.batch_cancel(client, arguments)
                 elif name == "batch_terminate":
                     return await batch_handlers.batch_terminate(client, arguments)
-                
+
                 # Schedule operations
                 elif name == "create_schedule":
                     return await schedule_handlers.create_schedule(client, arguments)
@@ -108,16 +117,10 @@ class TemporalMCPServer:
                     return await schedule_handlers.delete_schedule(client, arguments)
                 elif name == "trigger_schedule":
                     return await schedule_handlers.trigger_schedule(client, arguments)
-                
+
                 else:
-                    return [TextContent(
-                        type="text",
-                        text=json.dumps({
-                            "error": f"Unknown tool: {name}",
-                            "type": "unknown_tool"
-                        }, indent=2)
-                    )]
-            
+                    return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}", "type": "unknown_tool"}, indent=2))]
+
             except Exception as e:
                 return format_error_response(e, name)
 
@@ -125,10 +128,6 @@ class TemporalMCPServer:
         """Run the MCP server."""
         try:
             async with stdio_server() as (read_stream, write_stream):
-                await self.server.run(
-                    read_stream,
-                    write_stream,
-                    self.server.create_initialization_options()
-                )
+                await self.server.run(read_stream, write_stream, self.server.create_initialization_options())
         finally:
             await self.client_manager.disconnect()

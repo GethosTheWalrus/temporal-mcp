@@ -22,5 +22,8 @@ COPY server.py .
 COPY pyproject.toml .
 COPY temporal_mcp/ ./temporal_mcp/
 
+# Default cert directory for mTLS (mount certs here at runtime)
+RUN mkdir -p /certs
+
 # Run via stdio - this is the MCP standard
 CMD ["python", "-u", "server.py"]

@@ -139,8 +139,101 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 - **TEMPORAL_HOST**: Set to your Temporal server address (default: `localhost:7233`)
 - **TEMPORAL_NAMESPACE**: Set to your Temporal namespace (default: `default`)
 - **TEMPORAL_TLS_ENABLED**: Set to `true` for remote servers, `false` for local, or omit for auto-detection
+- **TEMPORAL_TLS_CLIENT_CERT_PATH**: Path to the mTLS client certificate file (for Temporal Cloud mTLS namespaces)
+- **TEMPORAL_TLS_CLIENT_KEY_PATH**: Path to the mTLS client private key file (for Temporal Cloud mTLS namespaces)
+- **TEMPORAL_API_KEY**: API key for Temporal Cloud API key authentication
 - Replace `192.168.69.98:7233` with your actual Temporal server address
 - For local development, you can use `localhost:7233` or `host.docker.internal:7233` (when running in Docker)
+
+### Temporal Cloud (API Key)
+
+The simplest way to connect to Temporal Cloud. When `TEMPORAL_API_KEY` is set, TLS is enabled automatically.
+
+**Using pip / uvx:**
+
+```json
+{
+  "servers": {
+    "temporal": {
+      "command": "uvx",
+      "args": ["temporal-mcp-server"],
+      "env": {
+        "TEMPORAL_HOST": "your-namespace.your-account.tmprl.cloud:7233",
+        "TEMPORAL_NAMESPACE": "your-namespace.your-account",
+        "TEMPORAL_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+**Using Docker:**
+
+```json
+{
+  "servers": {
+    "temporal": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "TEMPORAL_HOST",
+        "-e", "TEMPORAL_NAMESPACE",
+        "-e", "TEMPORAL_API_KEY",
+        "mcp/temporal:latest"
+      ],
+      "env": {
+        "TEMPORAL_HOST": "your-namespace.your-account.tmprl.cloud:7233",
+        "TEMPORAL_NAMESPACE": "your-namespace.your-account",
+        "TEMPORAL_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+### Temporal Cloud (mTLS)
+
+To connect to Temporal Cloud, provide your mTLS client certificate and key. The server will automatically enable TLS when client certs are provided.
+
+**Using Docker (mount certs into the container):**
+
+```json
+{
+  "mcp.servers": {
+    "temporal": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-v", "/path/to/certs:/certs:ro",
+        "-e", "TEMPORAL_HOST=your-namespace.tmprl.cloud:7233",
+        "-e", "TEMPORAL_NAMESPACE=your-namespace",
+        "-e", "TEMPORAL_TLS_CLIENT_CERT_PATH=/certs/client.pem",
+        "-e", "TEMPORAL_TLS_CLIENT_KEY_PATH=/certs/client.key",
+        "mcp/temporal:latest"
+      ]
+    }
+  }
+}
+```
+
+**Using pip / uvx:**
+
+```json
+{
+  "mcp.servers": {
+    "temporal": {
+      "command": "uvx",
+      "args": ["temporal-mcp-server"],
+      "env": {
+        "TEMPORAL_HOST": "your-namespace.tmprl.cloud:7233",
+        "TEMPORAL_NAMESPACE": "your-namespace",
+        "TEMPORAL_TLS_CLIENT_CERT_PATH": "/path/to/client.pem",
+        "TEMPORAL_TLS_CLIENT_KEY_PATH": "/path/to/client.key"
+      }
+    }
+  }
+}
+```
 
 ## Development
 

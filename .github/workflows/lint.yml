@@ -1,0 +1,31 @@
+name: Lint & Type Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint:
+    name: Lint & type check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          pip install flake8 mypy
+
+      - name: flake8
+        run: flake8 temporal_mcp/
+
+      - name: mypy
+        run: mypy temporal_mcp/
