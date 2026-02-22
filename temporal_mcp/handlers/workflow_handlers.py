@@ -126,7 +126,7 @@ async def describe_workflow(client: Client, args: dict) -> list[TextContent]:
     handle = client.get_workflow_handle(workflow_id)
     description = await handle.describe()
 
-    status_name = WorkflowExecutionStatus.Name(int(description.status)) if description.status is not None else "UNKNOWN"
+    status_name = WorkflowExecutionStatus.Name(int(description.status)) if description.status is not None else "UNKNOWN"  # type: ignore[arg-type]
 
     info = {
         "workflow_id": description.id,
@@ -171,7 +171,7 @@ async def list_workflows(client: Client, args: dict) -> list[TextContent]:
                 "workflow_id": workflow.id,
                 "run_id": workflow.run_id,
                 "workflow_type": workflow.workflow_type,
-                "status": WorkflowExecutionStatus.Name(int(workflow.status)) if workflow.status is not None else "UNKNOWN",
+                "status": WorkflowExecutionStatus.Name(int(workflow.status)) if workflow.status is not None else "UNKNOWN",  # type: ignore[arg-type]
                 "status_code": workflow.status,
                 "start_time": str(workflow.start_time),
             }
