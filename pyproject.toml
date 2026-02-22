@@ -1,6 +1,6 @@
 [project]
 name = "temporal-mcp-server"
-version = "0.2.0"
+version = "1.0.0"
 description = "MCP server for Temporal workflow orchestration"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -60,8 +60,10 @@ target-version = ["py310"]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
-branch = "main"
-build_command = false
+tag_format = "v{version}"
+
+[tool.semantic_release.branches.main]
+match = "main"
 
 [tool.semantic_release.remote]
 type = "github"
