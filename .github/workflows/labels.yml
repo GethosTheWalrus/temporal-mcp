@@ -1,0 +1,26 @@
+name: Create Labels
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/labels.yml'
+  workflow_dispatch:
+
+jobs:
+  labels:
+    name: Sync labels
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create dependencies --color 0075ca --description 'Dependency updates' --force
+          gh label create ci --color e4e669 --description 'CI/CD changes' --force
