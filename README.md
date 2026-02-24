@@ -82,17 +82,17 @@ Recommended when running via Docker. Configuration is passed through environment
 }
 ```
 
-### Python (CLI arguments)
+### Python via uvx (CLI arguments)
 
-Recommended when running from a local Python environment (e.g. installed via [PyPI](https://pypi.org/project/temporal-mcp-server/)). Configuration is passed as CLI arguments.
+Recommended when running from PyPI via [`uvx`](https://docs.astral.sh/uv/guides/tools/). No local install required — `uvx` fetches and runs the package automatically. Configuration is passed as CLI arguments.
 
 ```json
 {
   "servers": {
     "temporal": {
-      "command": "/path/to/venv/bin/python",
+      "command": "uvx",
       "args": [
-        "-m", "temporal_mcp",
+        "temporal-mcp-server",
         "--host", "localhost:7233",
         "--namespace", "default",
         "--tls-enabled", "false",
