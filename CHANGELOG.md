@@ -2,6 +2,27 @@
 
 <!-- version list -->
 
+## v1.1.1 (2026-02-24)
+
+### Bug Fixes
+
+- Remove redundant publish.yml now that release.yml handles PyPI publish directly
+  ([`1a022f1`](https://github.com/GethosTheWalrus/temporal-mcp/commit/1a022f1250628712762fcb5026aa7e487d04fa57))
+
+### Continuous Integration
+
+- Add pypi environment to publish job for OIDC trusted publisher
+  ([`400c733`](https://github.com/GethosTheWalrus/temporal-mcp/commit/400c73320638ed5e5ad42820324fb2d5f871a169))
+
+- Publish to PyPI directly from release workflow to avoid GITHUB_TOKEN trigger limitation
+  ([`3e39132`](https://github.com/GethosTheWalrus/temporal-mcp/commit/3e39132f7b4150087073f0206efcbf71d0126ba9))
+
+### Documentation
+
+- Update Python MCP config example to use uvx
+  ([`21bab91`](https://github.com/GethosTheWalrus/temporal-mcp/commit/21bab9108fb6515d328484410ae8f78d7411f9d0))
+
+
 ## v1.1.0 (2026-02-24)
 
 ### Continuous Integration
