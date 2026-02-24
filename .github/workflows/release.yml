@@ -7,7 +7,7 @@ on:
 
 jobs:
   release:
-    name: Semantic release
+    name: Semantic release and publish
     runs-on: ubuntu-latest
     concurrency: release
     permissions:
@@ -26,10 +26,29 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install python-semantic-release
-        run: pip install python-semantic-release
+      - name: Install tools
+        run: pip install python-semantic-release build
+
+      - name: Check for releasable commits
+        id: version_check
+        run: |
+          version=$(semantic-release version --print 2>/dev/null || true)
+          if [ -n "$version" ]; then
+            echo "will_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "will_release=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Run semantic release
+        if: steps.version_check.outputs.will_release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: semantic-release version --push
+
+      - name: Build package
+        if: steps.version_check.outputs.will_release == 'true'
+        run: python -m build
+
+      - name: Publish to PyPI
+        if: steps.version_check.outputs.will_release == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
