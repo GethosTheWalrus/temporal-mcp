@@ -7,12 +7,13 @@ on:
 
 jobs:
   release:
-    name: Semantic release and publish
+    name: Semantic release
     runs-on: ubuntu-latest
     concurrency: release
     permissions:
-      id-token: write
       contents: write
+    outputs:
+      released: ${{ steps.version_check.outputs.will_release }}
 
     steps:
       - name: Checkout
@@ -49,6 +50,28 @@ jobs:
         if: steps.version_check.outputs.will_release == 'true'
         run: python -m build
 
-      - name: Publish to PyPI
+      - name: Upload build artifacts
         if: steps.version_check.outputs.will_release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to PyPI
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
