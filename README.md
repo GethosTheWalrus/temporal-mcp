@@ -64,12 +64,18 @@ Recommended when running via Docker. Configuration is passed through environment
         "-e", "TEMPORAL_HOST",
         "-e", "TEMPORAL_NAMESPACE",
         "-e", "TEMPORAL_TLS_ENABLED",
+        "-e", "TEMPORAL_TLS_CLIENT_CERT_PATH",
+        "-e", "TEMPORAL_TLS_CLIENT_KEY_PATH",
+        "-e", "TEMPORAL_API_KEY",
         "mcp/temporal"
       ],
       "env": {
         "TEMPORAL_HOST": "localhost:7233",
         "TEMPORAL_NAMESPACE": "default",
-        "TEMPORAL_TLS_ENABLED": "false"
+        "TEMPORAL_TLS_ENABLED": "false",
+        "TEMPORAL_TLS_CLIENT_CERT_PATH": "/path/to/client.pem",
+        "TEMPORAL_TLS_CLIENT_KEY_PATH": "/path/to/client.key",
+        "TEMPORAL_API_KEY": "your-api-key"
       }
     }
   }
@@ -89,7 +95,10 @@ Recommended when running from a local Python environment (e.g. installed via [Py
         "-m", "temporal_mcp",
         "--host", "localhost:7233",
         "--namespace", "default",
-        "--tls-enabled", "false"
+        "--tls-enabled", "false",
+        "--tls-cert", "/path/to/client.pem",
+        "--tls-key", "/path/to/client.key",
+        "--api-key", "your-api-key"
       ]
     }
   }
