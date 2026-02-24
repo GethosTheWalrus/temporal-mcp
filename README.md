@@ -46,317 +46,68 @@ For more information about Temporal, refer to the official Temporal documentatio
 - **Activities**: https://docs.temporal.io/activities
 - **Python SDK**: https://docs.temporal.io/dev-guide/python
 
-## MCP Client Config Examples
+## VS Code MCP Config
 
-### OpenCode
+Add a `.vscode/mcp.json` file to your workspace. Choose the approach that fits your setup.
 
-Add to your OpenCode settings (`~/.config/opencode/opencode.json`):
+### Docker (environment variables)
 
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "temporal": {
-      "type": "local",
-      "command": [
-        "docker", "run", "-i", "--rm", "--network", "host",
-        "-e", "TEMPORAL_HOST=192.168.69.98:7233",
-        "-e", "TEMPORAL_NAMESPACE=default",
-        "-e", "TEMPORAL_TLS_ENABLED=false",
-        "temporal-mcp-server:latest"
-      ],
-      "enabled": true
-    }
-  }
-}
-```
-
-### VS Code (Copilot MCP)
-
-Add to your VS Code settings (`.vscode/mcp.json` or global settings):
+Recommended when running via Docker. Configuration is passed through environment variables.
 
 ```json
 {
-  "mcp.servers": {
-    "temporal": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm", "--network", "host",
-        "-e", "TEMPORAL_HOST=192.168.69.98:7233",
-        "-e", "TEMPORAL_NAMESPACE=default",
-        "-e", "TEMPORAL_TLS_ENABLED=false",
-        "temporal-mcp-server:latest"
-      ]
-    }
-  }
-}
-```
-
-### Cursor
-
-Add to your Cursor MCP settings (`~/.cursor/mcp.json` on macOS/Linux or `%APPDATA%\Cursor\mcp.json` on Windows):
-
-```json
-{
-  "mcpServers": {
-    "temporal": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm", "--network", "host",
-        "-e", "TEMPORAL_HOST=192.168.69.98:7233",
-        "-e", "TEMPORAL_NAMESPACE=default",
-        "-e", "TEMPORAL_TLS_ENABLED=false",
-        "temporal-mcp-server:latest"
-      ]
-    }
-  }
-}
-```
-
-### Claude Desktop
-
-Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
-
-```json
-{
-  "mcpServers": {
-    "temporal": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm", "--network", "host",
-        "-e", "TEMPORAL_HOST=192.168.69.98:7233",
-        "-e", "TEMPORAL_NAMESPACE=default",
-        "-e", "TEMPORAL_TLS_ENABLED=false",
-        "temporal-mcp-server:latest"
-      ]
-    }
-  }
-}
-```
-
-### Configuration Notes
-
-- **TEMPORAL_HOST**: Set to your Temporal server address (default: `localhost:7233`)
-- **TEMPORAL_NAMESPACE**: Set to your Temporal namespace (default: `default`)
-- **TEMPORAL_TLS_ENABLED**: Set to `true` for remote servers, `false` for local, or omit for auto-detection
-- **TEMPORAL_TLS_CLIENT_CERT_PATH**: Path to the mTLS client certificate file (for Temporal Cloud mTLS namespaces)
-- **TEMPORAL_TLS_CLIENT_KEY_PATH**: Path to the mTLS client private key file (for Temporal Cloud mTLS namespaces)
-- **TEMPORAL_API_KEY**: API key for Temporal Cloud API key authentication
-- Replace `192.168.69.98:7233` with your actual Temporal server address
-- For local development, you can use `localhost:7233` or `host.docker.internal:7233` (when running in Docker)
-
-### Temporal Cloud (API Key)
-
-The simplest way to connect to Temporal Cloud. When `TEMPORAL_API_KEY` is set, TLS is enabled automatically.
-
-#### OpenCode
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "temporal": {
-      "type": "local",
-      "command": [
-        "docker", "run", "-i", "--rm",
-        "-e", "TEMPORAL_HOST=your-namespace.your-account.tmprl.cloud:7233",
-        "-e", "TEMPORAL_NAMESPACE=your-namespace.your-account",
-        "-e", "TEMPORAL_API_KEY=your-api-key",
-        "temporal-mcp-server:latest"
-      ],
-      "enabled": true
-    }
-  }
-}
-```
-
-#### VS Code (Copilot MCP)
-
-**Docker:**
-
-```json
-{
-  "mcp.servers": {
+  "servers": {
     "temporal": {
       "command": "docker",
       "args": [
         "run", "-i", "--rm",
-        "-e", "TEMPORAL_HOST=your-namespace.your-account.tmprl.cloud:7233",
-        "-e", "TEMPORAL_NAMESPACE=your-namespace.your-account",
-        "-e", "TEMPORAL_API_KEY=your-api-key",
-        "temporal-mcp-server:latest"
-      ]
-    }
-  }
-}
-```
-
-**uvx:**
-
-```json
-{
-  "mcp.servers": {
-    "temporal": {
-      "command": "uvx",
-      "args": ["temporal-mcp-server"],
+        "-e", "TEMPORAL_HOST",
+        "-e", "TEMPORAL_NAMESPACE",
+        "-e", "TEMPORAL_TLS_ENABLED",
+        "mcp/temporal"
+      ],
       "env": {
-        "TEMPORAL_HOST": "your-namespace.your-account.tmprl.cloud:7233",
-        "TEMPORAL_NAMESPACE": "your-namespace.your-account",
-        "TEMPORAL_API_KEY": "your-api-key"
+        "TEMPORAL_HOST": "localhost:7233",
+        "TEMPORAL_NAMESPACE": "default",
+        "TEMPORAL_TLS_ENABLED": "false"
       }
     }
   }
 }
 ```
 
-#### Cursor
+### Python (CLI arguments)
+
+Recommended when running from a local Python environment (e.g. installed via [PyPI](https://pypi.org/project/temporal-mcp-server/)). Configuration is passed as CLI arguments.
 
 ```json
 {
-  "mcpServers": {
+  "servers": {
     "temporal": {
-      "command": "docker",
+      "command": "/path/to/venv/bin/python",
       "args": [
-        "run", "-i", "--rm",
-        "-e", "TEMPORAL_HOST=your-namespace.your-account.tmprl.cloud:7233",
-        "-e", "TEMPORAL_NAMESPACE=your-namespace.your-account",
-        "-e", "TEMPORAL_API_KEY=your-api-key",
-        "temporal-mcp-server:latest"
+        "-m", "temporal_mcp",
+        "--host", "localhost:7233",
+        "--namespace", "default",
+        "--tls-enabled", "false"
       ]
     }
   }
 }
 ```
 
-#### Claude Desktop
+### Configuration Options
 
-```json
-{
-  "mcpServers": {
-    "temporal": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-e", "TEMPORAL_HOST=your-namespace.your-account.tmprl.cloud:7233",
-        "-e", "TEMPORAL_NAMESPACE=your-namespace.your-account",
-        "-e", "TEMPORAL_API_KEY=your-api-key",
-        "temporal-mcp-server:latest"
-      ]
-    }
-  }
-}
-```
+| Option | CLI Argument | Environment Variable | Default |
+|--------|-------------|----------------------|---------|
+| Temporal host | `--host` | `TEMPORAL_HOST` | `localhost:7233` |
+| Namespace | `--namespace` | `TEMPORAL_NAMESPACE` | `default` |
+| TLS | `--tls-enabled` | `TEMPORAL_TLS_ENABLED` | auto-detect |
+| mTLS cert path | `--tls-cert` | `TEMPORAL_TLS_CLIENT_CERT_PATH` | — |
+| mTLS key path | `--tls-key` | `TEMPORAL_TLS_CLIENT_KEY_PATH` | — |
+| API key | `--api-key` | `TEMPORAL_API_KEY` | — |
 
-### Temporal Cloud (mTLS)
-
-To connect to Temporal Cloud, provide your mTLS client certificate and key. The server will automatically enable TLS when client certs are provided.
-
-#### OpenCode
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "temporal": {
-      "type": "local",
-      "command": [
-        "docker", "run", "-i", "--rm",
-        "-v", "/path/to/certs:/certs:ro",
-        "-e", "TEMPORAL_HOST=your-namespace.tmprl.cloud:7233",
-        "-e", "TEMPORAL_NAMESPACE=your-namespace",
-        "-e", "TEMPORAL_TLS_CLIENT_CERT_PATH=/certs/client.pem",
-        "-e", "TEMPORAL_TLS_CLIENT_KEY_PATH=/certs/client.key",
-        "temporal-mcp-server:latest"
-      ],
-      "enabled": true
-    }
-  }
-}
-```
-
-#### VS Code (Copilot MCP)
-
-**Docker:**
-
-```json
-{
-  "mcp.servers": {
-    "temporal": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-v", "/path/to/certs:/certs:ro",
-        "-e", "TEMPORAL_HOST=your-namespace.tmprl.cloud:7233",
-        "-e", "TEMPORAL_NAMESPACE=your-namespace",
-        "-e", "TEMPORAL_TLS_CLIENT_CERT_PATH=/certs/client.pem",
-        "-e", "TEMPORAL_TLS_CLIENT_KEY_PATH=/certs/client.key",
-        "temporal-mcp-server:latest"
-      ]
-    }
-  }
-}
-```
-
-**uvx:**
-
-```json
-{
-  "mcp.servers": {
-    "temporal": {
-      "command": "uvx",
-      "args": ["temporal-mcp-server"],
-      "env": {
-        "TEMPORAL_HOST": "your-namespace.tmprl.cloud:7233",
-        "TEMPORAL_NAMESPACE": "your-namespace",
-        "TEMPORAL_TLS_CLIENT_CERT_PATH": "/path/to/client.pem",
-        "TEMPORAL_TLS_CLIENT_KEY_PATH": "/path/to/client.key"
-      }
-    }
-  }
-}
-```
-
-#### Cursor
-
-```json
-{
-  "mcpServers": {
-    "temporal": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-v", "/path/to/certs:/certs:ro",
-        "-e", "TEMPORAL_HOST=your-namespace.tmprl.cloud:7233",
-        "-e", "TEMPORAL_NAMESPACE=your-namespace",
-        "-e", "TEMPORAL_TLS_CLIENT_CERT_PATH=/certs/client.pem",
-        "-e", "TEMPORAL_TLS_CLIENT_KEY_PATH=/certs/client.key",
-        "temporal-mcp-server:latest"
-      ]
-    }
-  }
-}
-```
-
-#### Claude Desktop
-
-```json
-{
-  "mcpServers": {
-    "temporal": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-v", "/path/to/certs:/certs:ro",
-        "-e", "TEMPORAL_HOST=your-namespace.tmprl.cloud:7233",
-        "-e", "TEMPORAL_NAMESPACE=your-namespace",
-        "-e", "TEMPORAL_TLS_CLIENT_CERT_PATH=/certs/client.pem",
-        "-e", "TEMPORAL_TLS_CLIENT_KEY_PATH=/certs/client.key",
-        "temporal-mcp-server:latest"
-      ]
-    }
-  }
-}
-```
+CLI arguments take precedence over environment variables. When `TEMPORAL_API_KEY` is set, TLS is enabled automatically. When mTLS cert/key paths are provided, TLS is also enabled automatically.
 
 ## Development
 
