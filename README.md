@@ -4,6 +4,8 @@
 
 This is a Model Context Protocol (MCP) server that provides tools for interacting with Temporal workflow orchestration. It enables AI assistants and other MCP clients to manage Temporal workflows, schedules, and workflow executions through a standardized interface. The server supports both local and remote Temporal instances.
 
+Read more on the [Temporal Code Exchange](https://temporal.io/code-exchange/temporal-mcp-server)
+
 ## Distributions
 - PyPI   - https://pypi.org/project/temporal-mcp-server/
 - Docker - https://hub.docker.com/r/mcp/temporal
