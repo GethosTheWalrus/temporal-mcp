@@ -3,6 +3,7 @@
 import asyncio
 import json
 from datetime import timedelta
+from typing import Any, cast
 
 from mcp.types import TextContent
 from temporalio.api.enums.v1 import ActivityExecutionStatus
@@ -18,8 +19,12 @@ def _to_timedelta(seconds: float | int | None) -> timedelta | None:
 def _status_name(status: object) -> str:
     if status is None:
         return "UNKNOWN"
+
+    if isinstance(status, int):
+        return ActivityExecutionStatus.Name(cast(Any, status))
+
     try:
-        return ActivityExecutionStatus.Name(int(status))
+        return ActivityExecutionStatus.Name(cast(Any, int(str(status))))
     except Exception:
         return str(status)
 
