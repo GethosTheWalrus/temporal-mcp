@@ -224,3 +224,143 @@ async def batch_terminate(client: Client, args: dict) -> list[TextContent]:
             result["errors_note"] = f"Showing first 5 of {len(errors)} errors"
 
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+
+async def batch_cancel_activities(client: Client, args: dict) -> list[TextContent]:
+    """Cancel multiple standalone activities with concurrent processing."""
+    import asyncio
+
+    query = args["query"]
+    limit = args.get("limit", 100)
+    concurrency = args.get("concurrency", 50)
+
+    print(f"Starting batch activity cancel with limit={limit}, concurrency={concurrency}", file=sys.stderr)
+
+    cancelled = []
+    errors = []
+
+    async def cancel_activity(activity_id: str, run_id: str | None) -> tuple[str, str | None, Exception | None]:
+        try:
+            handle = client.get_activity_handle(activity_id=activity_id, run_id=run_id)
+            await handle.cancel()
+            return activity_id, run_id, None
+        except Exception as e:
+            return activity_id, run_id, e
+
+    activities_to_cancel = []
+    async for activity in client.list_activities(query=query):
+        activities_to_cancel.append((activity.activity_id, getattr(activity, "run_id", None)))
+        if len(activities_to_cancel) >= limit:
+            break
+
+    for i in range(0, len(activities_to_cancel), concurrency):
+        batch = activities_to_cancel[i : i + concurrency]
+        results = await asyncio.gather(
+            *[cancel_activity(activity_id, run_id) for activity_id, run_id in batch],
+            return_exceptions=False,
+        )
+
+        for activity_id, run_id, error in results:
+            if error is None:
+                cancelled.append({"activity_id": activity_id, "run_id": run_id})
+            else:
+                errors.append(
+                    {
+                        "activity_id": activity_id,
+                        "run_id": run_id,
+                        "error": str(error),
+                        "error_type": type(error).__name__,
+                    }
+                )
+
+    result = {
+        "success_count": len(cancelled),
+        "error_count": len(errors),
+        "total_processed": len(cancelled) + len(errors),
+        "message": f"Successfully cancelled {len(cancelled)} activities.",
+    }
+
+    if len(cancelled) <= 10:
+        result["cancelled_activities"] = cancelled
+    elif cancelled:
+        result["sample_first"] = cancelled[:5]
+        result["sample_last"] = cancelled[-5:]
+        result["note"] = f"Showing first 5 and last 5 of {len(cancelled)} cancelled activities to avoid context overflow"
+
+    if errors:
+        result["sample_errors"] = errors[:5]
+        if len(errors) > 5:
+            result["errors_note"] = f"Showing first 5 of {len(errors)} errors"
+
+    return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+
+async def batch_terminate_activities(client: Client, args: dict) -> list[TextContent]:
+    """Terminate multiple standalone activities with concurrent processing."""
+    import asyncio
+
+    query = args["query"]
+    reason = args.get("reason", "Batch termination via MCP")
+    limit = args.get("limit", 100)
+    concurrency = args.get("concurrency", 50)
+
+    print(f"Starting batch activity terminate with limit={limit}, concurrency={concurrency}", file=sys.stderr)
+
+    terminated = []
+    errors = []
+
+    async def terminate_activity(activity_id: str, run_id: str | None) -> tuple[str, str | None, Exception | None]:
+        try:
+            handle = client.get_activity_handle(activity_id=activity_id, run_id=run_id)
+            await handle.terminate(reason=reason)
+            return activity_id, run_id, None
+        except Exception as e:
+            return activity_id, run_id, e
+
+    activities_to_terminate = []
+    async for activity in client.list_activities(query=query):
+        activities_to_terminate.append((activity.activity_id, getattr(activity, "run_id", None)))
+        if len(activities_to_terminate) >= limit:
+            break
+
+    for i in range(0, len(activities_to_terminate), concurrency):
+        batch = activities_to_terminate[i : i + concurrency]
+        results = await asyncio.gather(
+            *[terminate_activity(activity_id, run_id) for activity_id, run_id in batch],
+            return_exceptions=False,
+        )
+
+        for activity_id, run_id, error in results:
+            if error is None:
+                terminated.append({"activity_id": activity_id, "run_id": run_id})
+            else:
+                errors.append(
+                    {
+                        "activity_id": activity_id,
+                        "run_id": run_id,
+                        "error": str(error),
+                        "error_type": type(error).__name__,
+                    }
+                )
+
+    result = {
+        "reason": reason,
+        "success_count": len(terminated),
+        "error_count": len(errors),
+        "total_processed": len(terminated) + len(errors),
+        "message": f"Successfully terminated {len(terminated)} activities.",
+    }
+
+    if len(terminated) <= 10:
+        result["terminated_activities"] = terminated
+    elif terminated:
+        result["sample_first"] = terminated[:5]
+        result["sample_last"] = terminated[-5:]
+        result["note"] = f"Showing first 5 and last 5 of {len(terminated)} terminated activities to avoid context overflow"
+
+    if errors:
+        result["sample_errors"] = errors[:5]
+        if len(errors) > 5:
+            result["errors_note"] = f"Showing first 5 of {len(errors)} errors"
+
+    return [TextContent(type="text", text=json.dumps(result, indent=2))]

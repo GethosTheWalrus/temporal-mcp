@@ -99,6 +99,108 @@ def get_all_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="start_activity",
+            description="Start a new standalone Temporal activity execution",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "activity": {"type": "string", "description": "Activity type name to start"},
+                    "activity_id": {"type": "string", "description": "Unique identifier for the activity execution"},
+                    "task_queue": {"type": "string", "description": "Task queue for this activity"},
+                    "args": {"type": "object", "description": "Arguments to pass to the activity"},
+                    "start_to_close_timeout_seconds": {"type": "number", "description": "Activity start-to-close timeout in seconds"},
+                },
+                "required": ["activity", "activity_id", "task_queue"],
+            },
+        ),
+        Tool(
+            name="execute_activity",
+            description="Execute a standalone Temporal activity and wait for result",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "activity": {"type": "string", "description": "Activity type name to execute"},
+                    "activity_id": {"type": "string", "description": "Unique identifier for the activity execution"},
+                    "task_queue": {"type": "string", "description": "Task queue for this activity"},
+                    "args": {"type": "object", "description": "Arguments to pass to the activity"},
+                    "start_to_close_timeout_seconds": {"type": "number", "description": "Activity start-to-close timeout in seconds"},
+                },
+                "required": ["activity", "activity_id", "task_queue"],
+            },
+        ),
+        Tool(
+            name="get_activity_result",
+            description="Get the result of a standalone activity",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "activity_id": {"type": "string", "description": "Standalone activity execution ID"},
+                    "run_id": {"type": "string", "description": "Run ID for the standalone activity execution"},
+                    "timeout": {"type": "number", "description": "Optional timeout in seconds while waiting for result"},
+                },
+                "required": ["activity_id"],
+            },
+        ),
+        Tool(
+            name="describe_activity",
+            description="Get detailed information about a standalone activity execution",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "activity_id": {"type": "string", "description": "Standalone activity execution ID"},
+                    "run_id": {"type": "string", "description": "Run ID for the standalone activity execution"},
+                },
+                "required": ["activity_id"],
+            },
+        ),
+        Tool(
+            name="list_activities",
+            description="List standalone activity executions based on a query. Specify 'limit' to control results and 'skip' for pagination.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "List filter query (e.g., 'TaskQueue = \"my-task-queue\"')"},
+                    "limit": {"type": "number", "description": "Maximum number of results to return (default: 100)"},
+                    "skip": {"type": "number", "description": "Number of results to skip for pagination (default: 0)"},
+                },
+            },
+        ),
+        Tool(
+            name="count_activities",
+            description="Count standalone activity executions matching a query",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "List filter query (e.g., 'TaskQueue = \"my-task-queue\"')"},
+                },
+            },
+        ),
+        Tool(
+            name="cancel_activity",
+            description="Cancel a running standalone activity execution",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "activity_id": {"type": "string", "description": "Standalone activity execution ID"},
+                    "run_id": {"type": "string", "description": "Run ID for the standalone activity execution"},
+                },
+                "required": ["activity_id"],
+            },
+        ),
+        Tool(
+            name="terminate_activity",
+            description="Forcefully terminate a standalone activity execution",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "activity_id": {"type": "string", "description": "Standalone activity execution ID"},
+                    "run_id": {"type": "string", "description": "Run ID for the standalone activity execution"},
+                    "reason": {"type": "string", "description": "Reason for termination"},
+                },
+                "required": ["activity_id"],
+            },
+        ),
+        Tool(
             name="batch_signal",
             description="Send a signal to multiple workflows matching a query. Specify 'limit' to control batch size (default: 100).",
             inputSchema={
@@ -134,6 +236,33 @@ def get_all_tools() -> list[Tool]:
                     "query": {"type": "string", "description": "Query to select workflows to terminate"},
                     "reason": {"type": "string", "description": "Reason for termination"},
                     "limit": {"type": "number", "description": "Maximum number of workflows to terminate (default: 100)"},
+                },
+                "required": ["query"],
+            },
+        ),
+        Tool(
+            name="batch_cancel_activities",
+            description="Cancel multiple standalone activities matching a query with concurrent processing for speed. Use 'concurrency' to control parallel operations (default: 50).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Query to select activities to cancel"},
+                    "limit": {"type": "number", "description": "Maximum number of activities to cancel (default: 100)"},
+                    "concurrency": {"type": "number", "description": "Number of activities to cancel concurrently (default: 50)"},
+                },
+                "required": ["query"],
+            },
+        ),
+        Tool(
+            name="batch_terminate_activities",
+            description="Terminate multiple standalone activities matching a query. Specify 'limit' to control batch size (default: 100).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Query to select activities to terminate"},
+                    "reason": {"type": "string", "description": "Reason for termination"},
+                    "limit": {"type": "number", "description": "Maximum number of activities to terminate (default: 100)"},
+                    "concurrency": {"type": "number", "description": "Number of activities to terminate concurrently (default: 50)"},
                 },
                 "required": ["query"],
             },

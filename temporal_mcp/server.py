@@ -16,6 +16,7 @@ from .handlers import workflow_handlers
 from .handlers import query_handlers
 from .handlers import batch_handlers
 from .handlers import schedule_handlers
+from .handlers import activity_handlers
 
 
 class TemporalMCPServer:
@@ -88,6 +89,24 @@ class TemporalMCPServer:
                 elif name == "get_workflow_history":
                     return await workflow_handlers.get_workflow_history(client, arguments)
 
+                # Standalone activity operations
+                elif name == "start_activity":
+                    return await activity_handlers.start_activity(client, arguments)
+                elif name == "execute_activity":
+                    return await activity_handlers.execute_activity(client, arguments)
+                elif name == "get_activity_result":
+                    return await activity_handlers.get_activity_result(client, arguments)
+                elif name == "describe_activity":
+                    return await activity_handlers.describe_activity(client, arguments)
+                elif name == "list_activities":
+                    return await activity_handlers.list_activities(client, arguments)
+                elif name == "count_activities":
+                    return await activity_handlers.count_activities(client, arguments)
+                elif name == "cancel_activity":
+                    return await activity_handlers.cancel_activity(client, arguments)
+                elif name == "terminate_activity":
+                    return await activity_handlers.terminate_activity(client, arguments)
+
                 # Query and signal operations
                 elif name == "query_workflow":
                     return await query_handlers.query_workflow(client, arguments)
@@ -103,6 +122,10 @@ class TemporalMCPServer:
                     return await batch_handlers.batch_cancel(client, arguments)
                 elif name == "batch_terminate":
                     return await batch_handlers.batch_terminate(client, arguments)
+                elif name == "batch_cancel_activities":
+                    return await batch_handlers.batch_cancel_activities(client, arguments)
+                elif name == "batch_terminate_activities":
+                    return await batch_handlers.batch_terminate_activities(client, arguments)
 
                 # Schedule operations
                 elif name == "create_schedule":

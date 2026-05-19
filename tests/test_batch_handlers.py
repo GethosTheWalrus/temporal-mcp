@@ -88,3 +88,50 @@ class TestBatchTerminate:
         response = json.loads(result[0].text)
         assert len(response["terminated_workflows"]) == 1
         assert response["reason"] == "Batch cleanup"
+
+
+class TestBatchActivityCancel:
+    @pytest.mark.asyncio
+    async def test_batch_cancel_activities_success(self, mock_client):
+        mock_activity = MagicMock()
+        mock_activity.activity_id = "activity-1"
+        mock_activity.run_id = "run-1"
+
+        async def mock_list_activities(*, query):
+            yield mock_activity
+
+        mock_client.list_activities = mock_list_activities
+        mock_handle = AsyncMock()
+        mock_client.get_activity_handle = MagicMock(return_value=mock_handle)
+
+        args = {"query": "TaskQueue = 'test'", "limit": 10}
+        result = await batch_handlers.batch_cancel_activities(mock_client, args)
+
+        response = json.loads(result[0].text)
+        assert response["success_count"] == 1
+        assert response["cancelled_activities"][0]["activity_id"] == "activity-1"
+        mock_handle.cancel.assert_called_once()
+
+
+class TestBatchActivityTerminate:
+    @pytest.mark.asyncio
+    async def test_batch_terminate_activities_success(self, mock_client):
+        mock_activity = MagicMock()
+        mock_activity.activity_id = "activity-1"
+        mock_activity.run_id = "run-1"
+
+        async def mock_list_activities(*, query):
+            yield mock_activity
+
+        mock_client.list_activities = mock_list_activities
+        mock_handle = AsyncMock()
+        mock_client.get_activity_handle = MagicMock(return_value=mock_handle)
+
+        args = {"query": "TaskQueue = 'test'", "reason": "Batch cleanup", "limit": 10}
+        result = await batch_handlers.batch_terminate_activities(mock_client, args)
+
+        response = json.loads(result[0].text)
+        assert response["success_count"] == 1
+        assert response["reason"] == "Batch cleanup"
+        assert response["terminated_activities"][0]["activity_id"] == "activity-1"
+        mock_handle.terminate.assert_called_once_with(reason="Batch cleanup")
