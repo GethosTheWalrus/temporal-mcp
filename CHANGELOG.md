@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v1.3.0 (2026-05-19)
+
+### Bug Fixes
+
+- Resolve mypy enum typing in activity status helper
+  ([`3c8a955`](https://github.com/GethosTheWalrus/temporal-mcp/commit/3c8a9558557eb8caa2298c041fecc3f91e5660f8))
+
+### Continuous Integration
+
+- Add Python 3.14 coverage to workflows
+  ([`6e9cd0c`](https://github.com/GethosTheWalrus/temporal-mcp/commit/6e9cd0cb398b5158f682421cdae4297f31eb95f2))
+
+### Features
+
+- Add standalone activity tools and batch operations
+  ([`5985722`](https://github.com/GethosTheWalrus/temporal-mcp/commit/5985722953fac0e687ffe7e39b1a144f7f51ecfd))
+
+
 ## v1.2.0 (2026-05-19)
 
 ### Chores
