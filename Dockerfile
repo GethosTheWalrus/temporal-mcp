@@ -1,21 +1,39 @@
 # Dockerfile for Temporal MCP Server (stdio-based)
-FROM python:3.11-slim
+
+FROM python:3.14-alpine AS builder
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+# temporalio may compile from source on musl/Alpine
+RUN apk add --no-cache \
+    build-base \
+    libffi-dev \
+    openssl-dev \
+    protobuf \
+    protobuf-dev \
+    rust \
+    cargo
 
-# Copy requirements first for better caching
 COPY requirements.txt .
 
-# Upgrade pip and wheel to fix security vulnerabilities  
-# Force wheel upgrade before installing other packages
-RUN pip install --no-cache-dir --upgrade "pip>=26.0" "wheel>=0.46.2" "setuptools>=75.0"
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
+# Upgrade packaging tools before dependency install
+RUN pip install --no-cache-dir --upgrade "pip>=26.0" "wheel>=0.46.2" "setuptools>=75.0"
 RUN pip install --no-cache-dir -r requirements.txt
+
+FROM python:3.14-alpine AS runtime
+
+WORKDIR /app
+
+RUN apk add --no-cache \
+    libgcc \
+    libstdc++
+
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY --from=builder /opt/venv /opt/venv
 
 # Copy the application code
 COPY server.py .
