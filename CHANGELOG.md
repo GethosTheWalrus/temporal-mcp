@@ -2,6 +2,67 @@
 
 <!-- version list -->
 
+## v1.2.0 (2026-05-19)
+
+### Chores
+
+- **deps**: Bump actions/download-artifact from 4 to 8
+  ([`4043d7f`](https://github.com/GethosTheWalrus/temporal-mcp/commit/4043d7f0cdb028e63ca8cded14d6990f943a3d57))
+
+- **deps**: Bump actions/upload-artifact from 4 to 7
+  ([#15](https://github.com/GethosTheWalrus/temporal-mcp/pull/15),
+  [`5f382a0`](https://github.com/GethosTheWalrus/temporal-mcp/commit/5f382a0bd0c6ee6e252b95917f2e34ccd27153bf))
+
+- **deps-dev**: Update black requirement from >=25.0.0 to >=26.3.1
+  ([#21](https://github.com/GethosTheWalrus/temporal-mcp/pull/21),
+  [`93ce21d`](https://github.com/GethosTheWalrus/temporal-mcp/commit/93ce21d37a64bbcccdc209fde979ca57bebe3ee0))
+
+- **deps-dev**: Update black requirement from >=26.3.1 to >=26.5.0
+  ([#25](https://github.com/GethosTheWalrus/temporal-mcp/pull/25),
+  [`289b087`](https://github.com/GethosTheWalrus/temporal-mcp/commit/289b087cff37e0a537883633e26b7d49034b17d1))
+
+- **deps-dev**: Update flake8 requirement from >=6.0.0 to >=7.3.0
+  ([#17](https://github.com/GethosTheWalrus/temporal-mcp/pull/17),
+  [`2f9b35e`](https://github.com/GethosTheWalrus/temporal-mcp/commit/2f9b35eb0a0f872840ced4e13520403ef005a455))
+
+- **deps-dev**: Update mypy requirement from >=1.0.0 to >=1.20.2
+  ([#20](https://github.com/GethosTheWalrus/temporal-mcp/pull/20),
+  [`bb1d51e`](https://github.com/GethosTheWalrus/temporal-mcp/commit/bb1d51eb405a9a38b0ca158872879a64d4662f1f))
+
+- **deps-dev**: Update mypy requirement from >=1.20.2 to >=2.0.0
+  ([#23](https://github.com/GethosTheWalrus/temporal-mcp/pull/23),
+  [`3628bc8`](https://github.com/GethosTheWalrus/temporal-mcp/commit/3628bc8ef1d1b5935ab7a0a09de350073de034dd))
+
+- **deps-dev**: Update mypy requirement from >=2.0.0 to >=2.1.0
+  ([#24](https://github.com/GethosTheWalrus/temporal-mcp/pull/24),
+  [`ed2539f`](https://github.com/GethosTheWalrus/temporal-mcp/commit/ed2539f3507842ca1706a5504ce560aef9dd639c))
+
+- **deps-dev**: Update pre-commit requirement from >=4.0.0 to >=4.6.0
+  ([#19](https://github.com/GethosTheWalrus/temporal-mcp/pull/19),
+  [`5a54093`](https://github.com/GethosTheWalrus/temporal-mcp/commit/5a540939d4882f310dc154f1bf1197dc90b34bf6))
+
+- **deps-dev**: Update pytest requirement from >=7.0.0 to >=9.0.3
+  ([#22](https://github.com/GethosTheWalrus/temporal-mcp/pull/22),
+  [`47cdee8`](https://github.com/GethosTheWalrus/temporal-mcp/commit/47cdee88b021885a64292d81d4a645ebc3c14a97))
+
+- **deps-dev**: Update pytest-asyncio requirement
+  ([#18](https://github.com/GethosTheWalrus/temporal-mcp/pull/18),
+  [`886e14a`](https://github.com/GethosTheWalrus/temporal-mcp/commit/886e14a23423eaa5d9d0c38b9c89fa1652298409))
+
+### Documentation
+
+- Add distribution options to the README
+  ([`e9e6736`](https://github.com/GethosTheWalrus/temporal-mcp/commit/e9e673635131f5deb9ee751e4a161b1a60928479))
+
+- Fix indentation in README
+  ([`dc107ff`](https://github.com/GethosTheWalrus/temporal-mcp/commit/dc107ffac6fb6a85aaa6676a2787373463959c5a))
+
+### Features
+
+- Harden Docker image with multi-stage Alpine build
+  ([`e14debe`](https://github.com/GethosTheWalrus/temporal-mcp/commit/e14debe360f4f2842a7c0b9f2f682961bdb5ab68))
+
+
 ## v1.1.1 (2026-02-24)
 
 ### Bug Fixes
