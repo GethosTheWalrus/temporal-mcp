@@ -38,6 +38,7 @@ Read more on the [Temporal Code Exchange](https://temporal.io/code-exchange/temp
 
 - **`create_schedule`** - Create a new schedule for periodic workflow execution using cron expressions
 - **`list_schedules`** - List all schedules with pagination support (limit/skip)
+- **`describe_schedule`** - Get detailed configuration and runtime information about a schedule, including its spec, action, state, recent executions, and upcoming action times
 - **`pause_schedule`** - Pause a schedule to temporarily stop workflow executions
 - **`unpause_schedule`** - Resume a paused schedule
 - **`delete_schedule`** - Permanently delete a schedule
