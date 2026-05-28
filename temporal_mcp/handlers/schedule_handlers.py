@@ -4,7 +4,7 @@ import json
 import sys
 
 from mcp.types import TextContent
-from temporalio.client import Client, Schedule, ScheduleActionStartWorkflow, ScheduleSpec
+from temporalio.client import Client, Schedule, ScheduleActionStartWorkflow, ScheduleSpec, ScheduleDescription
 
 
 async def create_schedule(client: Client, args: dict) -> list[TextContent]:
@@ -171,3 +171,65 @@ async def trigger_schedule(client: Client, args: dict) -> list[TextContent]:
     await handle.trigger()
 
     return [TextContent(type="text", text=json.dumps({"status": "triggered", "schedule_id": schedule_id}, indent=2))]
+
+
+async def describe_schedule(client: Client, args: dict) -> list[TextContent]:
+    """Retrieve configuration and runtime information about a schedule.
+
+    Args:
+        client: Connected Temporal client
+        args: Arguments containing schedule_id
+
+    Returns:
+        Schedule description including spec, state, and recent execution info
+    """
+    schedule_id = args["schedule_id"]
+
+    handle = client.get_schedule_handle(schedule_id)
+    desc: ScheduleDescription = await handle.describe()
+
+    sched = desc.schedule
+    info = desc.info
+
+    action_info: dict = {}
+    if isinstance(sched.action, ScheduleActionStartWorkflow):
+        action_info = {
+            "workflow": sched.action.workflow,
+            "task_queue": sched.action.task_queue,
+            "workflow_execution_id": sched.action.id,
+        }
+
+    recent_actions = [
+        {
+            "scheduled_at": r.scheduled_at.isoformat(),
+            "started_at": r.started_at.isoformat(),
+        }
+        for r in info.recent_actions
+    ]
+
+    next_action_times = [t.isoformat() for t in info.next_action_times]
+
+    result = {
+        "schedule_id": desc.id,
+        "spec": {
+            "cron_expressions": list(sched.spec.cron_expressions),
+        },
+        "action": action_info,
+        "state": {
+            "paused": sched.state.paused,
+            "note": sched.state.note,
+            "limited_actions": sched.state.limited_actions,
+            "remaining_actions": sched.state.remaining_actions,
+        },
+        "info": {
+            "num_actions": info.num_actions,
+            "num_actions_missed_catchup_window": info.num_actions_missed_catchup_window,
+            "num_actions_skipped_overlap": info.num_actions_skipped_overlap,
+            "recent_actions": recent_actions,
+            "next_action_times": next_action_times,
+            "created_at": info.created_at.isoformat(),
+            "last_updated_at": info.last_updated_at.isoformat() if info.last_updated_at else None,
+        },
+    }
+
+    return [TextContent(type="text", text=json.dumps(result, indent=2))]
