@@ -63,6 +63,22 @@ class TestLoadClientCerts:
             mgr._load_client_certs()
 
 
+class TestLoadServerCa:
+    def test_no_path_returns_none(self):
+        assert TemporalClientManager()._load_server_ca() is None
+
+    def test_path_loaded(self, tmp_path):
+        ca_file = tmp_path / "ca.pem"
+        ca_file.write_bytes(b"CA_DATA")
+        mgr = TemporalClientManager(tls_ca_path=str(ca_file))
+        assert mgr._load_server_ca() == b"CA_DATA"
+
+    def test_missing_file_raises(self):
+        mgr = TemporalClientManager(tls_ca_path="/nonexistent/ca.pem")
+        with pytest.raises(FileNotFoundError):
+            mgr._load_server_ca()
+
+
 class TestDetermineTlsConfig:
     def test_mtls_returns_config_with_certs(self, tmp_path):
         cert_file = tmp_path / "client.pem"
@@ -100,6 +116,74 @@ class TestDetermineTlsConfig:
     def test_auto_detect_local_disables_tls(self):
         tls = TemporalClientManager(temporal_host="localhost:7233")._determine_tls_config()
         assert tls is None
+
+    def test_ca_path_enables_tls_and_sets_root_ca(self, tmp_path):
+        ca_file = tmp_path / "ca.pem"
+        ca_file.write_bytes(b"CA")
+        tls = TemporalClientManager(temporal_host="localhost:7233", tls_ca_path=str(ca_file))._determine_tls_config()
+        assert isinstance(tls, TLSConfig)
+        assert tls.server_root_ca_cert == b"CA"
+
+    def test_server_name_enables_tls_and_sets_domain(self):
+        tls = TemporalClientManager(temporal_host="localhost:7233", tls_server_name="temporal-frontend")._determine_tls_config()
+        assert isinstance(tls, TLSConfig)
+        assert tls.domain == "temporal-frontend"
+
+    def test_ca_overrides_explicit_tls_disabled(self, tmp_path):
+        # Providing a server CA should force TLS on even if tls_enabled=False
+        ca_file = tmp_path / "ca.pem"
+        ca_file.write_bytes(b"CA")
+        tls = TemporalClientManager(
+            temporal_host="localhost:7233",
+            tls_enabled=False,
+            tls_ca_path=str(ca_file),
+        )._determine_tls_config()
+        assert isinstance(tls, TLSConfig)
+        assert tls.server_root_ca_cert == b"CA"
+
+    def test_server_name_overrides_explicit_tls_disabled(self):
+        # Providing an SNI override should force TLS on even if tls_enabled=False
+        tls = TemporalClientManager(
+            temporal_host="localhost:7233",
+            tls_enabled=False,
+            tls_server_name="temporal-frontend",
+        )._determine_tls_config()
+        assert isinstance(tls, TLSConfig)
+        assert tls.domain == "temporal-frontend"
+
+    def test_ca_and_server_name_compose_with_api_key(self, tmp_path):
+        ca_file = tmp_path / "ca.pem"
+        ca_file.write_bytes(b"CA")
+        tls = TemporalClientManager(
+            temporal_host="ingress.example.com:443",
+            api_key="tok_abc",
+            tls_ca_path=str(ca_file),
+            tls_server_name="temporal-frontend",
+        )._determine_tls_config()
+        assert isinstance(tls, TLSConfig)
+        assert tls.server_root_ca_cert == b"CA"
+        assert tls.domain == "temporal-frontend"
+
+    def test_ca_and_server_name_compose_with_mtls(self, tmp_path):
+        cert_file = tmp_path / "client.pem"
+        key_file = tmp_path / "client.key"
+        ca_file = tmp_path / "ca.pem"
+        cert_file.write_bytes(b"CERT")
+        key_file.write_bytes(b"KEY")
+        ca_file.write_bytes(b"CA")
+
+        tls = TemporalClientManager(
+            temporal_host="ingress.example.com:443",
+            tls_client_cert_path=str(cert_file),
+            tls_client_key_path=str(key_file),
+            tls_ca_path=str(ca_file),
+            tls_server_name="temporal-frontend",
+        )._determine_tls_config()
+        assert isinstance(tls, TLSConfig)
+        assert tls.client_cert == b"CERT"
+        assert tls.client_private_key == b"KEY"
+        assert tls.server_root_ca_cert == b"CA"
+        assert tls.domain == "temporal-frontend"
 
 
 class TestConnect:
@@ -166,6 +250,27 @@ class TestConnect:
             assert isinstance(tls, TLSConfig)
             assert tls.client_cert == b"CERT"
             assert tls.client_private_key == b"KEY"
+
+    @pytest.mark.asyncio
+    async def test_connect_passes_ca_and_server_name(self, tmp_path):
+        ca_file = tmp_path / "ca.pem"
+        ca_file.write_bytes(b"CA")
+        mgr = TemporalClientManager(
+            temporal_host="ingress.example.com:443",
+            api_key="tok_abc",
+            tls_ca_path=str(ca_file),
+            tls_server_name="temporal-frontend",
+        )
+        mock_client = AsyncMock()
+
+        with patch("temporal_mcp.client.Client.connect", return_value=mock_client) as mock_connect:
+            await mgr.connect()
+            _, kwargs = mock_connect.call_args
+            tls = kwargs.get("tls")
+            assert isinstance(tls, TLSConfig)
+            assert tls.server_root_ca_cert == b"CA"
+            assert tls.domain == "temporal-frontend"
+            assert kwargs.get("api_key") == "tok_abc"
 
 
 class TestDisconnectAndEnsureConnected:
