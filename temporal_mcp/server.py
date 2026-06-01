@@ -140,6 +140,8 @@ class TemporalMCPServer:
                     return await schedule_handlers.delete_schedule(client, arguments)
                 elif name == "trigger_schedule":
                     return await schedule_handlers.trigger_schedule(client, arguments)
+                elif name == "describe_schedule":
+                    return await schedule_handlers.describe_schedule(client, arguments)
 
                 else:
                     return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}", "type": "unknown_tool"}, indent=2))]
