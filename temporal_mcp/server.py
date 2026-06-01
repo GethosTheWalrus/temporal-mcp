@@ -29,6 +29,8 @@ class TemporalMCPServer:
         tls_enabled: Optional[bool] = None,
         tls_client_cert_path: Optional[str] = None,
         tls_client_key_path: Optional[str] = None,
+        tls_ca_path: Optional[str] = None,
+        tls_server_name: Optional[str] = None,
         api_key: Optional[str] = None,
     ):
         """Initialize the Temporal MCP server.
@@ -39,6 +41,10 @@ class TemporalMCPServer:
             tls_enabled: Whether to use TLS for connection (None = auto-detect, True = force enable, False = force disable)
             tls_client_cert_path: Path to the TLS client certificate file (for mTLS / Temporal Cloud)
             tls_client_key_path: Path to the TLS client private key file (for mTLS / Temporal Cloud)
+            tls_ca_path: Path to a PEM CA certificate used to verify the server certificate
+                         (for clusters signed by a private CA not in the system trust store)
+            tls_server_name: Expected server name / SNI override used during the TLS handshake
+                             (for SNI-routed gateways where the cert is issued for a different name)
             api_key: API key for Temporal Cloud authentication
         """
         self.client_manager = TemporalClientManager(
@@ -47,6 +53,8 @@ class TemporalMCPServer:
             tls_enabled=tls_enabled,
             tls_client_cert_path=tls_client_cert_path,
             tls_client_key_path=tls_client_key_path,
+            tls_ca_path=tls_ca_path,
+            tls_server_name=tls_server_name,
             api_key=api_key,
         )
         self.server = Server("temporal-mcp-server")

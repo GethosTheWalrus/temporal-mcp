@@ -3,7 +3,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -64,6 +63,10 @@ class TestParseArgs:
                 "/certs/client.pem",
                 "--tls-key",
                 "/certs/client.key",
+                "--tls-ca",
+                "/certs/ca.pem",
+                "--tls-server-name",
+                "temporal-frontend",
                 "--api-key",
                 "secret",
             ]
@@ -73,6 +76,8 @@ class TestParseArgs:
         assert ns.tls_enabled == "true"
         assert ns.tls_cert == "/certs/client.pem"
         assert ns.tls_key == "/certs/client.key"
+        assert ns.tls_ca == "/certs/ca.pem"
+        assert ns.tls_server_name == "temporal-frontend"
         assert ns.api_key == "secret"
 
     def test_no_args_all_none(self):
@@ -82,6 +87,8 @@ class TestParseArgs:
         assert ns.tls_enabled is None
         assert ns.tls_cert is None
         assert ns.tls_key is None
+        assert ns.tls_ca is None
+        assert ns.tls_server_name is None
         assert ns.api_key is None
 
     def test_tls_enabled_normalised_to_lowercase(self):
@@ -126,6 +133,8 @@ class TestDefaults:
         kwargs = _run_main([], env={})
         assert kwargs["tls_client_cert_path"] is None
         assert kwargs["tls_client_key_path"] is None
+        assert kwargs["tls_ca_path"] is None
+        assert kwargs["tls_server_name"] is None
         assert kwargs["api_key"] is None
 
 
@@ -166,6 +175,14 @@ class TestEnvVarFallback:
     def test_api_key_from_env(self):
         kwargs = _run_main([], env={"TEMPORAL_API_KEY": "env-secret"})
         assert kwargs["api_key"] == "env-secret"
+
+    def test_ca_path_from_env(self):
+        kwargs = _run_main([], env={"TEMPORAL_TLS_CA_PATH": "/env/ca.pem"})
+        assert kwargs["tls_ca_path"] == "/env/ca.pem"
+
+    def test_server_name_from_env(self):
+        kwargs = _run_main([], env={"TEMPORAL_TLS_SERVER_NAME": "temporal-frontend"})
+        assert kwargs["tls_server_name"] == "temporal-frontend"
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +233,20 @@ class TestArgPrecedenceOverEnv:
         )
         assert kwargs["api_key"] == "arg-secret"
 
+    def test_ca_arg_overrides_env(self):
+        kwargs = _run_main(
+            ["--tls-ca", "/arg/ca.pem"],
+            env={"TEMPORAL_TLS_CA_PATH": "/env/ca.pem"},
+        )
+        assert kwargs["tls_ca_path"] == "/arg/ca.pem"
+
+    def test_server_name_arg_overrides_env(self):
+        kwargs = _run_main(
+            ["--tls-server-name", "arg-name"],
+            env={"TEMPORAL_TLS_SERVER_NAME": "env-name"},
+        )
+        assert kwargs["tls_server_name"] == "arg-name"
+
     def test_all_args_override_all_env_vars(self):
         kwargs = _run_main(
             [
@@ -229,6 +260,10 @@ class TestArgPrecedenceOverEnv:
                 "/arg/cert.pem",
                 "--tls-key",
                 "/arg/key.pem",
+                "--tls-ca",
+                "/arg/ca.pem",
+                "--tls-server-name",
+                "arg-name",
                 "--api-key",
                 "arg-secret",
             ],
@@ -238,6 +273,8 @@ class TestArgPrecedenceOverEnv:
                 "TEMPORAL_TLS_ENABLED": "true",
                 "TEMPORAL_TLS_CLIENT_CERT_PATH": "/env/cert.pem",
                 "TEMPORAL_TLS_CLIENT_KEY_PATH": "/env/key.pem",
+                "TEMPORAL_TLS_CA_PATH": "/env/ca.pem",
+                "TEMPORAL_TLS_SERVER_NAME": "env-name",
                 "TEMPORAL_API_KEY": "env-secret",
             },
         )
@@ -246,4 +283,6 @@ class TestArgPrecedenceOverEnv:
         assert kwargs["tls_enabled"] is False
         assert kwargs["tls_client_cert_path"] == "/arg/cert.pem"
         assert kwargs["tls_client_key_path"] == "/arg/key.pem"
+        assert kwargs["tls_ca_path"] == "/arg/ca.pem"
+        assert kwargs["tls_server_name"] == "arg-name"
         assert kwargs["api_key"] == "arg-secret"

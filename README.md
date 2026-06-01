@@ -72,6 +72,8 @@ Recommended when running via Docker. Configuration is passed through environment
         "-e", "TEMPORAL_TLS_ENABLED",
         "-e", "TEMPORAL_TLS_CLIENT_CERT_PATH",
         "-e", "TEMPORAL_TLS_CLIENT_KEY_PATH",
+        "-e", "TEMPORAL_TLS_CA_PATH",
+        "-e", "TEMPORAL_TLS_SERVER_NAME",
         "-e", "TEMPORAL_API_KEY",
         "mcp/temporal"
       ],
@@ -81,6 +83,8 @@ Recommended when running via Docker. Configuration is passed through environment
         "TEMPORAL_TLS_ENABLED": "false",
         "TEMPORAL_TLS_CLIENT_CERT_PATH": "/path/to/client.pem",
         "TEMPORAL_TLS_CLIENT_KEY_PATH": "/path/to/client.key",
+        "TEMPORAL_TLS_CA_PATH": "/path/to/ca.pem",
+        "TEMPORAL_TLS_SERVER_NAME": "temporal-frontend",
         "TEMPORAL_API_KEY": "your-api-key"
       }
     }
@@ -120,9 +124,33 @@ Recommended when running from PyPI via [`uvx`](https://docs.astral.sh/uv/guides/
 | TLS | `--tls-enabled` | `TEMPORAL_TLS_ENABLED` | auto-detect |
 | mTLS cert path | `--tls-cert` | `TEMPORAL_TLS_CLIENT_CERT_PATH` | — |
 | mTLS key path | `--tls-key` | `TEMPORAL_TLS_CLIENT_KEY_PATH` | — |
+| Server CA cert path | `--tls-ca` | `TEMPORAL_TLS_CA_PATH` | system trust store |
+| TLS server name (SNI) | `--tls-server-name` | `TEMPORAL_TLS_SERVER_NAME` | host portion of `--host` |
 | API key | `--api-key` | `TEMPORAL_API_KEY` | — |
 
-CLI arguments take precedence over environment variables. When `TEMPORAL_API_KEY` is set, TLS is enabled automatically. When mTLS cert/key paths are provided, TLS is also enabled automatically.
+CLI arguments take precedence over environment variables. TLS is enabled automatically when any of the following is provided: `TEMPORAL_API_KEY`, mTLS cert/key paths, `TEMPORAL_TLS_CA_PATH`, or `TEMPORAL_TLS_SERVER_NAME`. All TLS knobs compose, so you can mix mTLS, API-key auth, custom server CA, and SNI override on the same connection.
+
+#### Connecting through an SNI-routed gateway with a private CA
+
+Some self-hosted clusters expose the Temporal frontend through an Istio/Envoy gateway that routes by SNI, with the backend cert signed by an internal CA. In that case you typically need to override the SNI value (so the gateway routes correctly) and pin the internal CA (so the SDK can verify the server cert):
+
+```json
+{
+  "servers": {
+    "temporal": {
+      "command": "uvx",
+      "args": [
+        "temporal-mcp-server",
+        "--host", "temporal.example.com:443",
+        "--namespace", "my-namespace",
+        "--tls-server-name", "temporal-frontend",
+        "--tls-ca", "/path/to/internal-ca.pem",
+        "--api-key", "your-api-key"
+      ]
+    }
+  }
+}
+```
 
 ## Development
 

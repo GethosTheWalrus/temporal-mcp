@@ -16,6 +16,8 @@ class TemporalClientManager:
         tls_enabled: Optional[bool] = None,
         tls_client_cert_path: Optional[str] = None,
         tls_client_key_path: Optional[str] = None,
+        tls_ca_path: Optional[str] = None,
+        tls_server_name: Optional[str] = None,
         api_key: Optional[str] = None,
     ):
         """Initialize the Temporal client manager.
@@ -26,6 +28,15 @@ class TemporalClientManager:
             tls_enabled: Whether to use TLS for connection (None = auto-detect, True = force enable, False = force disable)
             tls_client_cert_path: Path to the TLS client certificate file (for mTLS / Temporal Cloud)
             tls_client_key_path: Path to the TLS client private key file (for mTLS / Temporal Cloud)
+            tls_ca_path: Path to a PEM CA certificate used to verify the server certificate
+                         (maps to ``temporalio.client.TLSConfig.server_root_ca_cert``).
+                         Useful when the server is signed by a private/internal CA that is
+                         not in the system trust store.
+            tls_server_name: Expected server name to validate the server certificate against,
+                             also used as the SNI value during the TLS handshake (maps to
+                             ``temporalio.client.TLSConfig.domain``). Useful when connecting
+                             through an SNI-routed gateway whose backend cert is issued for a
+                             name different from ``temporal_host``.
             api_key: API key for Temporal Cloud authentication
         """
         self.temporal_host = temporal_host
@@ -33,6 +44,8 @@ class TemporalClientManager:
         self.tls_enabled = tls_enabled
         self.tls_client_cert_path = tls_client_cert_path
         self.tls_client_key_path = tls_client_key_path
+        self.tls_ca_path = tls_ca_path
+        self.tls_server_name = tls_server_name
         self.api_key = api_key
         self.client: Optional[Client] = None
 
@@ -120,24 +133,52 @@ class TemporalClientManager:
         )
         return client_cert, client_key
 
-    def _determine_tls_config(self) -> Optional[TLSConfig]:
-        """Determine TLS configuration based on settings, hostname, and client certs.
+    def _load_server_ca(self) -> Optional[bytes]:
+        """Load the server CA certificate from disk, if configured.
 
         Returns:
-            TLS configuration or None
+            The CA certificate bytes, or None when no path is configured.
+
+        Raises:
+            FileNotFoundError: If the configured path does not exist.
+        """
+        if not self.tls_ca_path:
+            return None
+
+        with open(self.tls_ca_path, "rb") as f:
+            ca_bytes = f.read()
+
+        print(f"Loaded server CA certificate from {self.tls_ca_path}", file=sys.stderr)
+        return ca_bytes
+
+    def _determine_tls_config(self) -> Optional[TLSConfig]:
+        """Determine TLS configuration based on settings, hostname, and credentials.
+
+        Any of the following inputs forces TLS on, regardless of ``tls_enabled``:
+
+        - mTLS client cert + key
+        - Server CA cert path
+        - SNI / server name override
+        - API key
+
+        When TLS is enabled, the resulting :class:`TLSConfig` composes every
+        provided knob: mTLS material, custom server CA, and SNI override may be
+        used together.
+
+        Returns:
+            TLS configuration or ``None`` if TLS should not be used.
         """
         client_cert, client_key = self._load_client_certs()
+        server_ca = self._load_server_ca()
 
-        # If mTLS certs are provided, always enable TLS regardless of other settings
-        if client_cert and client_key:
-            return TLSConfig(
+        explicit_tls_inputs = bool((client_cert and client_key) or server_ca is not None or self.tls_server_name or self.api_key)
+
+        if explicit_tls_inputs:
+            return self._build_tls_config(
                 client_cert=client_cert,
-                client_private_key=client_key,
+                client_key=client_key,
+                server_ca=server_ca,
             )
-
-        # API key auth requires TLS
-        if self.api_key:
-            return TLSConfig()
 
         # Priority: explicit tls_enabled setting > auto-detect from hostname
         if self.tls_enabled is True:
@@ -150,6 +191,27 @@ class TemporalClientManager:
         else:
             # Auto-detect: disable TLS for local connections
             return None
+
+    def _build_tls_config(
+        self,
+        client_cert: Optional[bytes],
+        client_key: Optional[bytes],
+        server_ca: Optional[bytes],
+    ) -> TLSConfig:
+        """Construct a :class:`TLSConfig` populated only with the fields we have.
+
+        Empty fields are omitted so we get the SDK defaults (e.g. system trust
+        store when no custom CA is configured).
+        """
+        kwargs: dict = {}
+        if client_cert and client_key:
+            kwargs["client_cert"] = client_cert
+            kwargs["client_private_key"] = client_key
+        if server_ca is not None:
+            kwargs["server_root_ca_cert"] = server_ca
+        if self.tls_server_name:
+            kwargs["domain"] = self.tls_server_name
+        return TLSConfig(**kwargs)
 
     def _is_remote_host(self) -> bool:
         """Check if the host is a remote (non-local) host.
@@ -177,3 +239,5 @@ class TemporalClientManager:
 
         print(f"Namespace: {self.namespace}", file=sys.stderr)
         print(f"TLS Enabled: {tls_config is not None}", file=sys.stderr)
+        if tls_config is not None and self.tls_server_name:
+            print(f"TLS server name (SNI): {self.tls_server_name}", file=sys.stderr)
