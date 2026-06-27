@@ -325,6 +325,11 @@ def get_all_tools() -> list[Tool]:
             inputSchema={"type": "object", "properties": {"schedule_id": {"type": "string", "description": "The schedule ID to trigger"}}, "required": ["schedule_id"]},
         ),
         Tool(
+            name="describe_schedule",
+            description="Get detailed configuration and runtime information about a schedule, including its spec, action, state, recent executions, and upcoming action times",
+            inputSchema={"type": "object", "properties": {"schedule_id": {"type": "string", "description": "The schedule ID to describe"}}, "required": ["schedule_id"]},
+        ),
+        Tool(
             name="continue_as_new",
             description="Signal a workflow to continue as new (restart with new inputs while preserving history link)",
             inputSchema={
