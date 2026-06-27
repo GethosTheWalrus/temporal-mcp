@@ -2,6 +2,41 @@
 
 <!-- version list -->
 
+## v1.4.0 (2026-06-27)
+
+### Chores
+
+- **deps**: Bump actions/checkout from 6 to 7
+  ([#33](https://github.com/GethosTheWalrus/temporal-mcp/pull/33),
+  [`e13b806`](https://github.com/GethosTheWalrus/temporal-mcp/commit/e13b806dd3bc8626fb8b717393e93ca2f17f65f9))
+
+- **deps-dev**: Update black requirement from >=26.5.0 to >=26.5.1
+  ([#28](https://github.com/GethosTheWalrus/temporal-mcp/pull/28),
+  [`0ac9ef3`](https://github.com/GethosTheWalrus/temporal-mcp/commit/0ac9ef3f57019f994ceb69810619fe093b19f5e6))
+
+- **deps-dev**: Update pytest requirement from >=9.0.3 to >=9.1.0
+  ([#32](https://github.com/GethosTheWalrus/temporal-mcp/pull/32),
+  [`858efce`](https://github.com/GethosTheWalrus/temporal-mcp/commit/858efce07786c9b7558b441ff05270d6cfe58bfd))
+
+- **deps-dev**: Update pytest requirement from >=9.1.0 to >=9.1.1
+  ([#34](https://github.com/GethosTheWalrus/temporal-mcp/pull/34),
+  [`bbe92eb`](https://github.com/GethosTheWalrus/temporal-mcp/commit/bbe92ebc4375aff5e5efff6ffd7b69db8956d92b))
+
+- **deps-dev**: Update pytest-asyncio requirement
+  ([#30](https://github.com/GethosTheWalrus/temporal-mcp/pull/30),
+  [`223b20c`](https://github.com/GethosTheWalrus/temporal-mcp/commit/223b20c568a43a4e21089855ab3f2c7d01a043e0))
+
+### Documentation
+
+- Document describe_schedule tool in README
+  ([`05fede3`](https://github.com/GethosTheWalrus/temporal-mcp/commit/05fede3621e2cf7ad80333951f56c293b8250154))
+
+### Features
+
+- Add describe_schedule tool
+  ([`f15984a`](https://github.com/GethosTheWalrus/temporal-mcp/commit/f15984a10d04829c89648b9c8e10194a595936b8))
+
+
 ## v1.3.0 (2026-05-19)
 
 ### Bug Fixes
