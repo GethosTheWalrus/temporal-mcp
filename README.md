@@ -19,6 +19,7 @@ Read more on the [Temporal Code Exchange](https://temporal.io/code-exchange/temp
 - **`describe_workflow`** - Get detailed information about a workflow execution including status, timing, and metadata
 - **`list_workflows`** - List workflow executions based on a query filter with pagination support (limit/skip)
 - **`get_workflow_history`** - Retrieve the complete event history of a workflow execution
+- **`get_workflow_event`** - Retrieve a single workflow history event with decoded payload fields when present
 
 ### Workflow Control
 

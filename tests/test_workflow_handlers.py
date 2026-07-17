@@ -3,7 +3,12 @@
 import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from datetime import datetime
+from datetime import datetime, timezone
+from google.protobuf.timestamp_pb2 import Timestamp
+from temporalio.api.common.v1 import ActivityType, Payloads, WorkflowType
+from temporalio.api.enums.v1 import EventType
+from temporalio.api.history.v1 import ActivityTaskCompletedEventAttributes, ActivityTaskScheduledEventAttributes, HistoryEvent, WorkflowExecutionStartedEventAttributes
+from temporalio.converter import default
 
 from temporal_mcp.handlers import workflow_handlers
 
@@ -163,3 +168,112 @@ class TestGetWorkflowHistory:
         assert response["workflow_id"] == "test-workflow-123"
         assert len(response["events"]) == 2
         assert response["events"][0]["event_type"] == "WorkflowExecutionStarted"
+
+
+class TestGetWorkflowEvent:
+    @pytest.mark.asyncio
+    async def test_get_workflow_event_decodes_activity_result(self, mock_client):
+        data_converter = default()
+
+        scheduled_event = _history_event(
+            event_id=8,
+            event_type=EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            activity_task_scheduled_event_attributes=ActivityTaskScheduledEventAttributes(
+                activity_id="activity-123",
+                activity_type=ActivityType(name="FetchCustomer"),
+                input=Payloads(payloads=await data_converter.encode([{"customer_id": "123"}])),
+            ),
+        )
+        completed_event = _history_event(
+            event_id=12,
+            event_type=EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED,
+            activity_task_completed_event_attributes=ActivityTaskCompletedEventAttributes(
+                scheduled_event_id=8,
+                started_event_id=10,
+                result=Payloads(payloads=await data_converter.encode([{"status": "active"}])),
+            ),
+        )
+
+        async def mock_fetch_history_events():
+            for event in [scheduled_event, completed_event]:
+                yield event
+
+        mock_handle = AsyncMock()
+        mock_handle.fetch_history_events = mock_fetch_history_events
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+        mock_client.data_converter = data_converter
+
+        result = await workflow_handlers.get_workflow_event(mock_client, {"workflow_id": "test-workflow-123", "event_id": 12})
+
+        response = json.loads(result[0].text)
+        event = response["event"]
+        attrs = event["attributes"]
+
+        assert response["workflow_id"] == "test-workflow-123"
+        assert event["event_id"] == 12
+        assert event["event_type_name"] == "EVENT_TYPE_ACTIVITY_TASK_COMPLETED"
+        assert attrs["scheduled_event_id"] == 8
+        assert attrs["started_event_id"] == 10
+        assert attrs["activity"] == {"activity_id": "activity-123", "activity_type": "FetchCustomer"}
+        assert attrs["result"] == {"decoded": True, "value": {"status": "active"}, "payload_count": 1}
+        mock_client.get_workflow_handle.assert_called_once_with("test-workflow-123", run_id=None)
+
+    @pytest.mark.asyncio
+    async def test_get_workflow_event_reports_payload_decode_failure(self, mock_client):
+        data_converter = _FailingDataConverter()
+
+        event = _history_event(
+            event_id=1,
+            event_type=EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED,
+            workflow_execution_started_event_attributes=WorkflowExecutionStartedEventAttributes(
+                workflow_type=WorkflowType(name="TestWorkflow"),
+                input=Payloads(payloads=await default().encode([{"customer_id": "123"}])),
+            ),
+        )
+
+        async def mock_fetch_history_events():
+            yield event
+
+        mock_handle = AsyncMock()
+        mock_handle.fetch_history_events = mock_fetch_history_events
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+        mock_client.data_converter = data_converter
+
+        result = await workflow_handlers.get_workflow_event(mock_client, {"workflow_id": "test-workflow-123", "event_id": 1, "run_id": "run-456"})
+
+        response = json.loads(result[0].text)
+        decoded_input = response["event"]["attributes"]["input"]
+
+        assert response["run_id"] == "run-456"
+        assert decoded_input["decoded"] is False
+        assert decoded_input["error"] == "bad payload"
+        assert decoded_input["error_type"] == "ValueError"
+        assert decoded_input["payload_count"] == 1
+        mock_client.get_workflow_handle.assert_called_once_with("test-workflow-123", run_id="run-456")
+
+    @pytest.mark.asyncio
+    async def test_get_workflow_event_not_found(self, mock_client):
+        async def mock_fetch_history_events():
+            if False:
+                yield None
+
+        mock_handle = AsyncMock()
+        mock_handle.fetch_history_events = mock_fetch_history_events
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+
+        result = await workflow_handlers.get_workflow_event(mock_client, {"workflow_id": "test-workflow-123", "event_id": 99})
+
+        response = json.loads(result[0].text)
+        assert response["type"] == "not_found"
+        assert response["event_id"] == 99
+
+
+def _history_event(event_id, event_type, **attributes):
+    event_time = Timestamp()
+    event_time.FromDatetime(datetime(2025, 10, 30, 12, 0, event_id % 60, tzinfo=timezone.utc))
+    return HistoryEvent(event_id=event_id, event_type=event_type, event_time=event_time, **attributes)
+
+
+class _FailingDataConverter:
+    async def decode(self, payloads):
+        raise ValueError("bad payload")
