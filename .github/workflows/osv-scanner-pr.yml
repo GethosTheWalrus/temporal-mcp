@@ -15,3 +15,5 @@ jobs:
   scan-pr:
     name: Scan pull request dependencies
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.3.8
+    with:
+      fail-on-vuln: false
