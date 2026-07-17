@@ -10,3 +10,7 @@ black>=26.5.1
 flake8>=7.3.0
 mypy>=2.2.0
 pre-commit>=4.6.0
+
+# Security floors for transitive development dependencies
+filelock>=3.20.3
+pygments>=2.20.0
