@@ -53,7 +53,8 @@ class TestScheduleHandlers:
 
     @pytest.mark.asyncio
     async def test_pause_schedule_success(self, mock_client):
-        mock_handle = AsyncMock()
+        mock_handle = MagicMock()
+        mock_handle.pause = AsyncMock()
         mock_client.get_schedule_handle = MagicMock(return_value=mock_handle)
 
         args = {"schedule_id": "test-schedule", "note": "Paused for maintenance"}
@@ -67,7 +68,8 @@ class TestScheduleHandlers:
 
     @pytest.mark.asyncio
     async def test_unpause_schedule_success(self, mock_client):
-        mock_handle = AsyncMock()
+        mock_handle = MagicMock()
+        mock_handle.unpause = AsyncMock()
         mock_client.get_schedule_handle = MagicMock(return_value=mock_handle)
 
         args = {"schedule_id": "test-schedule", "note": "Maintenance complete"}
@@ -80,7 +82,8 @@ class TestScheduleHandlers:
 
     @pytest.mark.asyncio
     async def test_delete_schedule_success(self, mock_client):
-        mock_handle = AsyncMock()
+        mock_handle = MagicMock()
+        mock_handle.delete = AsyncMock()
         mock_client.get_schedule_handle = MagicMock(return_value=mock_handle)
 
         result = await schedule_handlers.delete_schedule(mock_client, {"schedule_id": "test-schedule"})
@@ -92,7 +95,8 @@ class TestScheduleHandlers:
 
     @pytest.mark.asyncio
     async def test_trigger_schedule_success(self, mock_client):
-        mock_handle = AsyncMock()
+        mock_handle = MagicMock()
+        mock_handle.trigger = AsyncMock()
         mock_client.get_schedule_handle = MagicMock(return_value=mock_handle)
 
         result = await schedule_handlers.trigger_schedule(mock_client, {"schedule_id": "test-schedule"})
@@ -146,7 +150,7 @@ class TestScheduleHandlers:
         mock_description.schedule = mock_schedule
         mock_description.info = mock_info
 
-        mock_handle = AsyncMock()
+        mock_handle = MagicMock()
         mock_handle.describe = AsyncMock(return_value=mock_description)
         mock_client.get_schedule_handle = MagicMock(return_value=mock_handle)
 
@@ -210,7 +214,7 @@ class TestScheduleHandlers:
         mock_description.schedule = mock_schedule
         mock_description.info = mock_info
 
-        mock_handle = AsyncMock()
+        mock_handle = MagicMock()
         mock_handle.describe = AsyncMock(return_value=mock_description)
         mock_client.get_schedule_handle = MagicMock(return_value=mock_handle)
 
