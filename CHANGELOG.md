@@ -2,6 +2,51 @@
 
 <!-- version list -->
 
+## v1.5.0 (2026-07-18)
+
+### Chores
+
+- Raise vulnerable dependency floors
+  ([`1cd7f6b`](https://github.com/GethosTheWalrus/temporal-mcp/commit/1cd7f6b89421e6a0fbcd77bc70d203b746110ab9))
+
+- **deps-dev**: Update mypy requirement from >=2.1.0 to >=2.2.0
+  ([#37](https://github.com/GethosTheWalrus/temporal-mcp/pull/37),
+  [`90440a1`](https://github.com/GethosTheWalrus/temporal-mcp/commit/90440a181692f67f567558eeb8fc28dadea7bf41))
+
+### Continuous Integration
+
+- Add Docker Scout scanning
+  ([`de391d4`](https://github.com/GethosTheWalrus/temporal-mcp/commit/de391d469253a26539631c698406244a6f30f067))
+
+- Add security scanning workflows
+  ([`cf579c3`](https://github.com/GethosTheWalrus/temporal-mcp/commit/cf579c3a0e0dee65c580b38870e5def6d468ee43))
+
+- Fix OSV PR workflow syntax
+  ([`895f0b4`](https://github.com/GethosTheWalrus/temporal-mcp/commit/895f0b4693aef239d296dc0b79a97507f9ab3302))
+
+- Make OSV PR comparison advisory
+  ([`fd536ab`](https://github.com/GethosTheWalrus/temporal-mcp/commit/fd536abb54da52f9699155daac636dd524021f1a))
+
+- Report OSV PR findings without blocking
+  ([`3a8834c`](https://github.com/GethosTheWalrus/temporal-mcp/commit/3a8834c69a8b047eecc8c7f6507025b8eb2c1b8d))
+
+- Require Docker Scout credentials
+  ([`6d84126`](https://github.com/GethosTheWalrus/temporal-mcp/commit/6d841262f7e0585038255154dc1f53026a1756fa))
+
+### Features
+
+- Add workflow event payload tool
+  ([`aef620f`](https://github.com/GethosTheWalrus/temporal-mcp/commit/aef620fce7d517c2523ce17251eefa226a7833b1))
+
+### Testing
+
+- Fix async mock warnings
+  ([`b28e46a`](https://github.com/GethosTheWalrus/temporal-mcp/commit/b28e46ac6807274d0c5e6587fbf9a4b759909bc5))
+
+- Fix async mock warnings
+  ([`8e4cbf0`](https://github.com/GethosTheWalrus/temporal-mcp/commit/8e4cbf081b5629c6586cf4ca7e199b0e0925c780))
+
+
 ## v1.4.0 (2026-06-27)
 
 ### Chores
