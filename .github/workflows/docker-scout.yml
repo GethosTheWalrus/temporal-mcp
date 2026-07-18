@@ -37,6 +37,14 @@ jobs:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ env.DOCKERHUB_TOKEN }}
 
+      - name: Verify Docker Scout credentials
+        run: |
+          if [ -z "$DOCKERHUB_USERNAME" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
+            echo "Docker Scout requires DOCKERHUB_USERNAME and DOCKERHUB_TOKEN repository secrets."
+            echo "Create a Docker Hub access token and add both secrets, then rerun this workflow."
+            exit 1
+          fi
+
       - name: Build image locally
         uses: docker/build-push-action@v7
         with:
@@ -51,6 +59,8 @@ jobs:
         with:
           command: cves
           image: local://${{ env.IMAGE_TAG }}
+          dockerhub-user: ${{ env.DOCKERHUB_USERNAME }}
+          dockerhub-password: ${{ env.DOCKERHUB_TOKEN }}
           only-severities: critical,high
           only-fixed: true
           sarif-file: docker-scout.sarif.json
