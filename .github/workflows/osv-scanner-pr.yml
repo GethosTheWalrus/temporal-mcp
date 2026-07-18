@@ -14,7 +14,6 @@ permissions:
 jobs:
   scan-pr:
     name: Scan pull request dependencies
-    continue-on-error: true
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.3.8
     with:
       fail-on-vuln: false
