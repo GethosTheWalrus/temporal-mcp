@@ -99,6 +99,19 @@ def get_all_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="get_workflow_event",
+            description="Get a single workflow history event with decoded payload fields when present",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "workflow_id": {"type": "string", "description": "The workflow execution ID"},
+                    "event_id": {"type": "number", "description": "The history event ID to fetch"},
+                    "run_id": {"type": "string", "description": "Optional run ID for the workflow execution"},
+                },
+                "required": ["workflow_id", "event_id"],
+            },
+        ),
+        Tool(
             name="start_activity",
             description="Start a new standalone Temporal activity execution",
             inputSchema={
