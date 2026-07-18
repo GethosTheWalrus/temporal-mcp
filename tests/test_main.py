@@ -1,7 +1,7 @@
 """Tests for __main__ entry point: CLI arg parsing, env var fallback, and precedence."""
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -20,7 +20,7 @@ def _run_main(argv: list[str], env: dict[str, str] | None = None):
     def fake_server(**kwargs):
         captured.update(kwargs)
         instance = MagicMock()
-        instance.run = AsyncMock()
+        instance.run = MagicMock()
         return instance
 
     with (
