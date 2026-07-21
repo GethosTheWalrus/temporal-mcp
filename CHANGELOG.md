@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.7.0 (2026-07-21)
+
+### Continuous Integration
+
+- Consolidate OSV scanning workflow
+  ([`7523f01`](https://github.com/GethosTheWalrus/temporal-mcp/commit/7523f01d3da305ccd7f12d09f872645972b314ee))
+
+### Features
+
+- Expand schedule descriptions
+  ([`d59d30c`](https://github.com/GethosTheWalrus/temporal-mcp/commit/d59d30cdfdec1b7a3b36714d4d0f139c8d9e7511))
+
+
 ## v1.6.0 (2026-07-21)
 
 ### Chores
