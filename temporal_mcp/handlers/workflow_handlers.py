@@ -8,7 +8,7 @@ from typing import Any
 from mcp.types import TextContent
 from temporalio.client import Client
 from temporalio.api.common.v1 import Payloads
-from temporalio.api.enums.v1 import EventType, RetryState, WorkflowExecutionStatus
+from temporalio.api.enums.v1 import EventType, RetryState, StartChildWorkflowExecutionFailedCause, TimeoutType, WorkflowExecutionStatus
 from temporalio.api.failure.v1 import Failure
 
 
@@ -226,20 +226,171 @@ async def get_workflow_history(client: Client, args: dict) -> list[TextContent]:
     handle = client.get_workflow_handle(workflow_id)
 
     events = []
+    scheduled_activities: dict[int, dict[str, Any]] = {}
+    initiated_child_workflows: dict[int, dict[str, Any]] = {}
     count = 0
     async for event in handle.fetch_history_events():
-        events.append(
-            {
-                "event_id": event.event_id,
-                "event_type": event.event_type,
-                "event_time": str(event.event_time),
+        attributes_type = event.WhichOneof("attributes")
+        if attributes_type == "activity_task_scheduled_event_attributes":
+            scheduled_attrs = event.activity_task_scheduled_event_attributes
+            scheduled_activities[event.event_id] = {
+                "activity_id": scheduled_attrs.activity_id,
+                "activity_type": scheduled_attrs.activity_type.name,
             }
-        )
+        elif attributes_type == "start_child_workflow_execution_initiated_event_attributes":
+            initiated_attrs = event.start_child_workflow_execution_initiated_event_attributes
+            initiated_child_workflows[event.event_id] = {
+                "workflow_id": initiated_attrs.workflow_id,
+                "workflow_type": initiated_attrs.workflow_type.name,
+            }
+
+        events.append(_workflow_history_event_to_dict(event, scheduled_activities, initiated_child_workflows))
         count += 1
         if count >= limit:
             break
 
     return [TextContent(type="text", text=json.dumps({"workflow_id": workflow_id, "events": events, "count": len(events)}, indent=2))]
+
+
+def _workflow_history_event_to_dict(event: Any, scheduled_activities: dict[int, dict[str, Any]], initiated_child_workflows: dict[int, dict[str, Any]]) -> dict[str, Any]:
+    event_info = {
+        "event_id": event.event_id,
+        "event_type": event.event_type,
+        "event_type_name": _enum_name(EventType, event.event_type),
+        "event_time": str(event.event_time),
+        "attributes": {},
+    }
+
+    attributes_type = event.WhichOneof("attributes")
+    if attributes_type == "activity_task_scheduled_event_attributes":
+        attrs = event.activity_task_scheduled_event_attributes
+        event_info["attributes"] = {
+            "activity": {
+                "activity_id": attrs.activity_id,
+                "activity_type": attrs.activity_type.name,
+            }
+        }
+    elif attributes_type == "activity_task_failed_event_attributes":
+        attrs = event.activity_task_failed_event_attributes
+        event_info["attributes"] = {
+            "scheduled_event_id": attrs.scheduled_event_id,
+            "started_event_id": attrs.started_event_id,
+            "activity": scheduled_activities.get(attrs.scheduled_event_id),
+            "retry_state": attrs.retry_state,
+            "retry_state_name": _enum_name(RetryState, attrs.retry_state),
+            "failure": _failure_to_metadata(attrs.failure),
+        }
+    elif attributes_type == "start_child_workflow_execution_initiated_event_attributes":
+        attrs = event.start_child_workflow_execution_initiated_event_attributes
+        event_info["attributes"] = {
+            "workflow_task_completed_event_id": attrs.workflow_task_completed_event_id,
+            "workflow": {
+                "workflow_id": attrs.workflow_id,
+                "workflow_type": attrs.workflow_type.name,
+            },
+        }
+    elif attributes_type in {
+        "child_workflow_execution_started_event_attributes",
+        "child_workflow_execution_completed_event_attributes",
+        "child_workflow_execution_failed_event_attributes",
+        "child_workflow_execution_canceled_event_attributes",
+        "child_workflow_execution_terminated_event_attributes",
+    }:
+        attrs = getattr(event, attributes_type)
+        workflow = _child_workflow_metadata(attrs)
+        initiated_workflow = initiated_child_workflows.get(attrs.initiated_event_id)
+        if initiated_workflow:
+            workflow = {**initiated_workflow, **workflow}
+
+        child_attrs: dict[str, Any] = {
+            "initiated_event_id": attrs.initiated_event_id,
+            "started_event_id": getattr(attrs, "started_event_id", None),
+            "workflow": workflow,
+        }
+        if attributes_type == "child_workflow_execution_failed_event_attributes":
+            child_attrs.update(
+                {
+                    "retry_state": attrs.retry_state,
+                    "retry_state_name": _enum_name(RetryState, attrs.retry_state),
+                    "failure": _failure_to_metadata(attrs.failure),
+                }
+            )
+        event_info["attributes"] = child_attrs
+    elif attributes_type == "start_child_workflow_execution_failed_event_attributes":
+        attrs = event.start_child_workflow_execution_failed_event_attributes
+        event_info["attributes"] = {
+            "initiated_event_id": attrs.initiated_event_id,
+            "workflow_task_completed_event_id": attrs.workflow_task_completed_event_id,
+            "cause": attrs.cause,
+            "cause_name": _enum_name(StartChildWorkflowExecutionFailedCause, attrs.cause),
+            "workflow": {
+                "workflow_id": attrs.workflow_id,
+                "workflow_type": attrs.workflow_type.name,
+            },
+        }
+
+    return event_info
+
+
+def _child_workflow_metadata(attrs: Any) -> dict[str, Any]:
+    workflow_execution = attrs.workflow_execution
+    return {
+        "workflow_id": workflow_execution.workflow_id,
+        "run_id": workflow_execution.run_id,
+        "workflow_type": attrs.workflow_type.name,
+    }
+
+
+def _failure_to_metadata(failure: Failure) -> dict[str, Any]:
+    failure_type = failure.WhichOneof("failure_info")
+    result: dict[str, Any] = {
+        "message": failure.message,
+        "source": failure.source,
+        "stack_trace": failure.stack_trace,
+        "type": failure_type.replace("_info", "") if failure_type else None,
+    }
+
+    if failure_type == "application_failure_info":
+        application_info = failure.application_failure_info
+        result["application_failure"] = {
+            "type": application_info.type,
+            "non_retryable": application_info.non_retryable,
+        }
+    elif failure_type == "timeout_failure_info":
+        timeout_info = failure.timeout_failure_info
+        result["timeout_failure"] = {
+            "timeout_type": timeout_info.timeout_type,
+            "timeout_type_name": _enum_name(TimeoutType, timeout_info.timeout_type),
+        }
+    elif failure_type == "server_failure_info":
+        result["server_failure"] = {"non_retryable": failure.server_failure_info.non_retryable}
+    elif failure_type == "activity_failure_info":
+        activity_info = failure.activity_failure_info
+        result["activity_failure"] = {
+            "scheduled_event_id": activity_info.scheduled_event_id,
+            "started_event_id": activity_info.started_event_id,
+            "identity": activity_info.identity,
+            "activity_id": activity_info.activity_id,
+            "activity_type": activity_info.activity_type.name,
+            "retry_state": activity_info.retry_state,
+            "retry_state_name": _enum_name(RetryState, activity_info.retry_state),
+        }
+    elif failure_type == "child_workflow_execution_failure_info":
+        child_workflow_info = failure.child_workflow_execution_failure_info
+        result["child_workflow_failure"] = {
+            "initiated_event_id": child_workflow_info.initiated_event_id,
+            "started_event_id": child_workflow_info.started_event_id,
+            "workflow": {
+                "workflow_id": child_workflow_info.workflow_execution.workflow_id,
+                "run_id": child_workflow_info.workflow_execution.run_id,
+                "workflow_type": child_workflow_info.workflow_type.name,
+            },
+            "retry_state": child_workflow_info.retry_state,
+            "retry_state_name": _enum_name(RetryState, child_workflow_info.retry_state),
+        }
+
+    result["cause"] = _failure_to_metadata(failure.cause) if failure.HasField("cause") else None
+    return result
 
 
 async def get_workflow_event(client: Client, args: dict) -> list[TextContent]:
