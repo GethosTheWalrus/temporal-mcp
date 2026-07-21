@@ -5,9 +5,18 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from datetime import datetime, timezone
 from google.protobuf.timestamp_pb2 import Timestamp
-from temporalio.api.common.v1 import ActivityType, Payloads, WorkflowType
-from temporalio.api.enums.v1 import EventType
-from temporalio.api.history.v1 import ActivityTaskCompletedEventAttributes, ActivityTaskScheduledEventAttributes, HistoryEvent, WorkflowExecutionStartedEventAttributes
+from temporalio.api.common.v1 import ActivityType, Payloads, WorkflowExecution, WorkflowType
+from temporalio.api.enums.v1 import EventType, RetryState
+from temporalio.api.failure.v1 import ApplicationFailureInfo, Failure
+from temporalio.api.history.v1 import (
+    ActivityTaskCompletedEventAttributes,
+    ActivityTaskFailedEventAttributes,
+    ActivityTaskScheduledEventAttributes,
+    ChildWorkflowExecutionFailedEventAttributes,
+    HistoryEvent,
+    StartChildWorkflowExecutionInitiatedEventAttributes,
+    WorkflowExecutionStartedEventAttributes,
+)
 from temporalio.converter import default
 
 from temporal_mcp.handlers import workflow_handlers
@@ -168,6 +177,110 @@ class TestGetWorkflowHistory:
         assert response["workflow_id"] == "test-workflow-123"
         assert len(response["events"]) == 2
         assert response["events"][0]["event_type"] == "WorkflowExecutionStarted"
+
+    @pytest.mark.asyncio
+    async def test_get_workflow_history_includes_activity_failure_metadata(self, mock_client):
+        scheduled_event = _history_event(
+            event_id=8,
+            event_type=EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            activity_task_scheduled_event_attributes=ActivityTaskScheduledEventAttributes(
+                activity_id="delete-volume-claim-abc123",
+                activity_type=ActivityType(name="volume-claim-delete"),
+            ),
+        )
+        failed_event = _history_event(
+            event_id=12,
+            event_type=EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
+            activity_task_failed_event_attributes=ActivityTaskFailedEventAttributes(
+                scheduled_event_id=8,
+                started_event_id=10,
+                retry_state=RetryState.RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED,
+                failure=Failure(
+                    message="activity failed",
+                    source="PythonSDK",
+                    stack_trace="stack trace",
+                    application_failure_info=ApplicationFailureInfo(type="NullPointerException", non_retryable=False),
+                    cause=Failure(message="root cause", application_failure_info=ApplicationFailureInfo(type="ValueError")),
+                ),
+            ),
+        )
+
+        async def mock_fetch_history_events():
+            for event in [scheduled_event, failed_event]:
+                yield event
+
+        mock_handle = AsyncMock()
+        mock_handle.fetch_history_events = mock_fetch_history_events
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+
+        result = await workflow_handlers.get_workflow_history(mock_client, {"workflow_id": "test-workflow-123"})
+
+        response = json.loads(result[0].text)
+        failed_attrs = response["events"][1]["attributes"]
+
+        assert response["events"][1]["event_type_name"] == "EVENT_TYPE_ACTIVITY_TASK_FAILED"
+        assert failed_attrs["scheduled_event_id"] == 8
+        assert failed_attrs["started_event_id"] == 10
+        assert failed_attrs["activity"] == {"activity_id": "delete-volume-claim-abc123", "activity_type": "volume-claim-delete"}
+        assert failed_attrs["retry_state"] == RetryState.RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED
+        assert failed_attrs["retry_state_name"] == "RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED"
+        assert failed_attrs["failure"]["message"] == "activity failed"
+        assert failed_attrs["failure"]["source"] == "PythonSDK"
+        assert failed_attrs["failure"]["stack_trace"] == "stack trace"
+        assert failed_attrs["failure"]["type"] == "application_failure"
+        assert failed_attrs["failure"]["application_failure"] == {"type": "NullPointerException", "non_retryable": False}
+        assert failed_attrs["failure"]["cause"]["message"] == "root cause"
+        assert "__raw__" not in failed_attrs
+        assert "input" not in failed_attrs
+
+    @pytest.mark.asyncio
+    async def test_get_workflow_history_includes_child_workflow_metadata(self, mock_client):
+        initiated_event = _history_event(
+            event_id=5,
+            event_type=EventType.EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_INITIATED,
+            start_child_workflow_execution_initiated_event_attributes=StartChildWorkflowExecutionInitiatedEventAttributes(
+                workflow_id="child-workflow-id",
+                workflow_type=WorkflowType(name="ChildWorkflow"),
+                workflow_task_completed_event_id=4,
+            ),
+        )
+        failed_event = _history_event(
+            event_id=9,
+            event_type=EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_FAILED,
+            child_workflow_execution_failed_event_attributes=ChildWorkflowExecutionFailedEventAttributes(
+                initiated_event_id=5,
+                started_event_id=6,
+                workflow_execution=WorkflowExecution(workflow_id="child-workflow-id", run_id="child-run-id"),
+                workflow_type=WorkflowType(name="ChildWorkflow"),
+                retry_state=RetryState.RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED,
+                failure=Failure(message="child failed", application_failure_info=ApplicationFailureInfo(type="ChildError")),
+            ),
+        )
+
+        async def mock_fetch_history_events():
+            for event in [initiated_event, failed_event]:
+                yield event
+
+        mock_handle = AsyncMock()
+        mock_handle.fetch_history_events = mock_fetch_history_events
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+
+        result = await workflow_handlers.get_workflow_history(mock_client, {"workflow_id": "parent-workflow-id"})
+
+        response = json.loads(result[0].text)
+        initiated_attrs = response["events"][0]["attributes"]
+        failed_attrs = response["events"][1]["attributes"]
+
+        assert initiated_attrs["workflow_task_completed_event_id"] == 4
+        assert initiated_attrs["workflow"] == {"workflow_id": "child-workflow-id", "workflow_type": "ChildWorkflow"}
+        assert response["events"][1]["event_type_name"] == "EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_FAILED"
+        assert failed_attrs["initiated_event_id"] == 5
+        assert failed_attrs["started_event_id"] == 6
+        assert failed_attrs["workflow"] == {"workflow_id": "child-workflow-id", "workflow_type": "ChildWorkflow", "run_id": "child-run-id"}
+        assert failed_attrs["retry_state_name"] == "RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED"
+        assert failed_attrs["failure"]["application_failure"] == {"type": "ChildError", "non_retryable": False}
+        assert "__raw__" not in failed_attrs
+        assert "result" not in failed_attrs
 
 
 class TestGetWorkflowEvent:
