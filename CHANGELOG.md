@@ -2,6 +2,28 @@
 
 <!-- version list -->
 
+## v1.6.0 (2026-07-21)
+
+### Chores
+
+- **deps**: Bump actions/checkout from 4 to 7
+  ([#44](https://github.com/GethosTheWalrus/temporal-mcp/pull/44),
+  [`f183bdb`](https://github.com/GethosTheWalrus/temporal-mcp/commit/f183bdb212c58ca023a46aad52ed3dd031726459))
+
+- **deps-dev**: Update filelock requirement from >=3.20.3 to >=3.31.0
+  ([#45](https://github.com/GethosTheWalrus/temporal-mcp/pull/45),
+  [`b9f4e0e`](https://github.com/GethosTheWalrus/temporal-mcp/commit/b9f4e0ef5be911ba83fedb8b3d9438f98df98dfc))
+
+- **deps-dev**: Update mypy requirement from >=2.2.0 to >=2.3.0
+  ([#46](https://github.com/GethosTheWalrus/temporal-mcp/pull/46),
+  [`103ee29`](https://github.com/GethosTheWalrus/temporal-mcp/commit/103ee29cc59c2da4161099fb8903f332ba3fbfc8))
+
+### Features
+
+- Enrich workflow history metadata
+  ([`43d16c1`](https://github.com/GethosTheWalrus/temporal-mcp/commit/43d16c102fad9f96867a363ab3f6ea21a9015717))
+
+
 ## v1.5.0 (2026-07-18)
 
 ### Chores
