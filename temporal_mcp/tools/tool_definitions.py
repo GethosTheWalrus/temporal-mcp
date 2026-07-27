@@ -93,6 +93,7 @@ def get_all_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "workflow_id": {"type": "string", "description": "The workflow execution ID"},
+                    "run_id": {"type": "string", "description": "Optional run ID for the workflow execution"},
                     "limit": {"type": "number", "description": "Maximum number of history events to return (default: 1000)"},
                 },
                 "required": ["workflow_id"],

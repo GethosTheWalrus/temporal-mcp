@@ -215,15 +215,16 @@ async def get_workflow_history(client: Client, args: dict) -> list[TextContent]:
 
     Args:
         client: Connected Temporal client
-        args: Arguments containing workflow_id and optional limit
+        args: Arguments containing workflow_id and optional limit, run_id
 
     Returns:
         Workflow history events
     """
     workflow_id = args["workflow_id"]
     limit = args.get("limit", 1000)
+    run_id = args.get("run_id")
 
-    handle = client.get_workflow_handle(workflow_id)
+    handle = client.get_workflow_handle(workflow_id, run_id=run_id)
 
     events = []
     scheduled_activities: dict[int, dict[str, Any]] = {}
@@ -249,7 +250,7 @@ async def get_workflow_history(client: Client, args: dict) -> list[TextContent]:
         if count >= limit:
             break
 
-    return [TextContent(type="text", text=json.dumps({"workflow_id": workflow_id, "events": events, "count": len(events)}, indent=2))]
+    return [TextContent(type="text", text=json.dumps({"workflow_id": workflow_id, "run_id": run_id, "events": events, "count": len(events)}, indent=2))]
 
 
 def _workflow_history_event_to_dict(event: Any, scheduled_activities: dict[int, dict[str, Any]], initiated_child_workflows: dict[int, dict[str, Any]]) -> dict[str, Any]:
