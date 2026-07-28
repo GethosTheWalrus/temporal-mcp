@@ -2,7 +2,7 @@
 temporalio>=1.5.0
 
 # Model Context Protocol
-mcp>=1.28.1
+mcp>=1.28.1,<2.0.0
 
 # Security floors for transitive runtime dependencies
 idna>=3.15
