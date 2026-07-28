@@ -2,6 +2,28 @@
 
 <!-- version list -->
 
+## v1.7.1 (2026-07-28)
+
+### Bug Fixes
+
+- Cap MCP SDK below 2.0
+  ([`18f75fd`](https://github.com/GethosTheWalrus/temporal-mcp/commit/18f75fd035ef628f6f968ea64e666af3db1abf43))
+
+### Chores
+
+- **deps**: Bump actions/setup-python from 6 to 7
+  ([#51](https://github.com/GethosTheWalrus/temporal-mcp/pull/51),
+  [`ba305e9`](https://github.com/GethosTheWalrus/temporal-mcp/commit/ba305e921d84432d11009e854f1f8c7acb9dc131))
+
+- **deps-dev**: Update filelock requirement from >=3.31.0 to >=3.32.0
+  ([#53](https://github.com/GethosTheWalrus/temporal-mcp/pull/53),
+  [`a2412bf`](https://github.com/GethosTheWalrus/temporal-mcp/commit/a2412bf4c566a06d5eeba48bdac85f7b43a313cd))
+
+- **deps-dev**: Update pre-commit requirement from >=4.6.0 to >=4.6.1
+  ([#52](https://github.com/GethosTheWalrus/temporal-mcp/pull/52),
+  [`1b2d4c0`](https://github.com/GethosTheWalrus/temporal-mcp/commit/1b2d4c0a3eb2a13fb5d67381208402a53ff78ab5))
+
+
 ## v1.7.0 (2026-07-21)
 
 ### Continuous Integration
