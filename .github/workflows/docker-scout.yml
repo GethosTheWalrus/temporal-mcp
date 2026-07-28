@@ -37,15 +37,27 @@ jobs:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ env.DOCKERHUB_TOKEN }}
 
-      - name: Verify Docker Scout credentials
+      - name: Check Docker Scout credentials
+        id: scout-credentials
         run: |
-          if [ -z "$DOCKERHUB_USERNAME" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
-            echo "Docker Scout requires DOCKERHUB_USERNAME and DOCKERHUB_TOKEN repository secrets."
-            echo "Create a Docker Hub access token and add both secrets, then rerun this workflow."
-            exit 1
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
+          echo "enabled=false" >> "$GITHUB_OUTPUT"
+
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            echo "::notice::Skipping Docker Scout because Docker Hub secrets are unavailable to this pull request."
+            exit 0
+          fi
+
+          echo "::error::Docker Scout requires DOCKERHUB_USERNAME and DOCKERHUB_TOKEN repository secrets."
+          echo "Create a Docker Hub access token and add both secrets, then rerun this workflow."
+          exit 1
+
       - name: Build image locally
+        if: ${{ steps.scout-credentials.outputs.enabled == 'true' }}
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -55,6 +67,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Scan image with Docker Scout
+        if: ${{ steps.scout-credentials.outputs.enabled == 'true' }}
         uses: docker/scout-action@v1
         with:
           command: cves
@@ -69,7 +82,7 @@ jobs:
           write-comment: false
 
       - name: Upload Docker Scout SARIF
-        if: ${{ always() && hashFiles('docker-scout.sarif.json') != '' }}
+        if: ${{ always() && steps.scout-credentials.outputs.enabled == 'true' && hashFiles('docker-scout.sarif.json') != '' }}
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: docker-scout.sarif.json
