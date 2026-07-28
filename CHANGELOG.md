@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.8.0 (2026-07-28)
+
+### Bug Fixes
+
+- Satisfy MCP 2 type checks
+  ([`85cac11`](https://github.com/GethosTheWalrus/temporal-mcp/commit/85cac112eee043cecec4742cc7a57fc16c7d03ac))
+
+- Use MCP content block types
+  ([`1965fe1`](https://github.com/GethosTheWalrus/temporal-mcp/commit/1965fe11d6f3d0aefb95c145b82f724ec26003cb))
+
+### Features
+
+- Support MCP SDK 2.0
+  ([`d051e43`](https://github.com/GethosTheWalrus/temporal-mcp/commit/d051e43a4a40d974f14240996edd4e661b6cda44))
+
+
 ## v1.7.1 (2026-07-28)
 
 ### Bug Fixes
