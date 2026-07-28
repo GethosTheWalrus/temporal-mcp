@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent
+from mcp.types import CallToolRequestParams, CallToolResult, ListToolsResult, TextContent
 
 from .client import TemporalClientManager
 from .tools.tool_definitions import get_all_tools
@@ -49,107 +49,110 @@ class TemporalMCPServer:
             tls_client_key_path=tls_client_key_path,
             api_key=api_key,
         )
-        self.server = Server("temporal-mcp-server")
-        self._setup_handlers()
+        self.server = Server(
+            "temporal-mcp-server",
+            on_list_tools=self._list_tools,
+            on_call_tool=self._call_tool,
+        )
 
-    def _setup_handlers(self):
-        """Set up MCP request handlers."""
+    async def _list_tools(self, context: Any, params: Any) -> ListToolsResult:
+        """List available Temporal tools."""
+        return ListToolsResult(tools=get_all_tools())
 
-        @self.server.list_tools()
-        async def list_tools() -> list[Tool]:
-            """List available Temporal tools."""
-            return get_all_tools()
+    async def _call_tool(self, context: Any, params: CallToolRequestParams) -> CallToolResult:
+        """Handle tool execution requests."""
+        content = await self._execute_tool(params.name, params.arguments or {})
+        return CallToolResult(content=content)
 
-        @self.server.call_tool()
-        async def call_tool(name: str, arguments: Any) -> list[TextContent]:
-            """Handle tool execution requests."""
-            # Ensure connection
-            try:
-                await self.client_manager.connect()
-            except Exception as e:
-                return format_connection_error(e)
+    async def _execute_tool(self, name: str, arguments: Any) -> list[TextContent]:
+        """Execute a Temporal tool by name."""
+        # Ensure connection
+        try:
+            await self.client_manager.connect()
+        except Exception as e:
+            return format_connection_error(e)
 
-            # Route to appropriate handler
-            try:
-                client = self.client_manager.ensure_connected()
+        # Route to appropriate handler
+        try:
+            client = self.client_manager.ensure_connected()
 
-                # Workflow operations
-                if name == "start_workflow":
-                    return await workflow_handlers.start_workflow(client, arguments)
-                elif name == "cancel_workflow":
-                    return await workflow_handlers.cancel_workflow(client, arguments)
-                elif name == "terminate_workflow":
-                    return await workflow_handlers.terminate_workflow(client, arguments)
-                elif name == "get_workflow_result":
-                    return await workflow_handlers.get_workflow_result(client, arguments)
-                elif name == "describe_workflow":
-                    return await workflow_handlers.describe_workflow(client, arguments)
-                elif name == "list_workflows":
-                    return await workflow_handlers.list_workflows(client, arguments)
-                elif name == "get_workflow_history":
-                    return await workflow_handlers.get_workflow_history(client, arguments)
-                elif name == "get_workflow_event":
-                    return await workflow_handlers.get_workflow_event(client, arguments)
+            # Workflow operations
+            if name == "start_workflow":
+                return await workflow_handlers.start_workflow(client, arguments)
+            elif name == "cancel_workflow":
+                return await workflow_handlers.cancel_workflow(client, arguments)
+            elif name == "terminate_workflow":
+                return await workflow_handlers.terminate_workflow(client, arguments)
+            elif name == "get_workflow_result":
+                return await workflow_handlers.get_workflow_result(client, arguments)
+            elif name == "describe_workflow":
+                return await workflow_handlers.describe_workflow(client, arguments)
+            elif name == "list_workflows":
+                return await workflow_handlers.list_workflows(client, arguments)
+            elif name == "get_workflow_history":
+                return await workflow_handlers.get_workflow_history(client, arguments)
+            elif name == "get_workflow_event":
+                return await workflow_handlers.get_workflow_event(client, arguments)
 
-                # Standalone activity operations
-                elif name == "start_activity":
-                    return await activity_handlers.start_activity(client, arguments)
-                elif name == "execute_activity":
-                    return await activity_handlers.execute_activity(client, arguments)
-                elif name == "get_activity_result":
-                    return await activity_handlers.get_activity_result(client, arguments)
-                elif name == "describe_activity":
-                    return await activity_handlers.describe_activity(client, arguments)
-                elif name == "list_activities":
-                    return await activity_handlers.list_activities(client, arguments)
-                elif name == "count_activities":
-                    return await activity_handlers.count_activities(client, arguments)
-                elif name == "cancel_activity":
-                    return await activity_handlers.cancel_activity(client, arguments)
-                elif name == "terminate_activity":
-                    return await activity_handlers.terminate_activity(client, arguments)
+            # Standalone activity operations
+            elif name == "start_activity":
+                return await activity_handlers.start_activity(client, arguments)
+            elif name == "execute_activity":
+                return await activity_handlers.execute_activity(client, arguments)
+            elif name == "get_activity_result":
+                return await activity_handlers.get_activity_result(client, arguments)
+            elif name == "describe_activity":
+                return await activity_handlers.describe_activity(client, arguments)
+            elif name == "list_activities":
+                return await activity_handlers.list_activities(client, arguments)
+            elif name == "count_activities":
+                return await activity_handlers.count_activities(client, arguments)
+            elif name == "cancel_activity":
+                return await activity_handlers.cancel_activity(client, arguments)
+            elif name == "terminate_activity":
+                return await activity_handlers.terminate_activity(client, arguments)
 
-                # Query and signal operations
-                elif name == "query_workflow":
-                    return await query_handlers.query_workflow(client, arguments)
-                elif name == "signal_workflow":
-                    return await query_handlers.signal_workflow(client, arguments)
-                elif name == "continue_as_new":
-                    return await query_handlers.continue_as_new(client, arguments)
+            # Query and signal operations
+            elif name == "query_workflow":
+                return await query_handlers.query_workflow(client, arguments)
+            elif name == "signal_workflow":
+                return await query_handlers.signal_workflow(client, arguments)
+            elif name == "continue_as_new":
+                return await query_handlers.continue_as_new(client, arguments)
 
-                # Batch operations
-                elif name == "batch_signal":
-                    return await batch_handlers.batch_signal(client, arguments)
-                elif name == "batch_cancel":
-                    return await batch_handlers.batch_cancel(client, arguments)
-                elif name == "batch_terminate":
-                    return await batch_handlers.batch_terminate(client, arguments)
-                elif name == "batch_cancel_activities":
-                    return await batch_handlers.batch_cancel_activities(client, arguments)
-                elif name == "batch_terminate_activities":
-                    return await batch_handlers.batch_terminate_activities(client, arguments)
+            # Batch operations
+            elif name == "batch_signal":
+                return await batch_handlers.batch_signal(client, arguments)
+            elif name == "batch_cancel":
+                return await batch_handlers.batch_cancel(client, arguments)
+            elif name == "batch_terminate":
+                return await batch_handlers.batch_terminate(client, arguments)
+            elif name == "batch_cancel_activities":
+                return await batch_handlers.batch_cancel_activities(client, arguments)
+            elif name == "batch_terminate_activities":
+                return await batch_handlers.batch_terminate_activities(client, arguments)
 
-                # Schedule operations
-                elif name == "create_schedule":
-                    return await schedule_handlers.create_schedule(client, arguments)
-                elif name == "list_schedules":
-                    return await schedule_handlers.list_schedules(client, arguments)
-                elif name == "pause_schedule":
-                    return await schedule_handlers.pause_schedule(client, arguments)
-                elif name == "unpause_schedule":
-                    return await schedule_handlers.unpause_schedule(client, arguments)
-                elif name == "delete_schedule":
-                    return await schedule_handlers.delete_schedule(client, arguments)
-                elif name == "trigger_schedule":
-                    return await schedule_handlers.trigger_schedule(client, arguments)
-                elif name == "describe_schedule":
-                    return await schedule_handlers.describe_schedule(client, arguments)
+            # Schedule operations
+            elif name == "create_schedule":
+                return await schedule_handlers.create_schedule(client, arguments)
+            elif name == "list_schedules":
+                return await schedule_handlers.list_schedules(client, arguments)
+            elif name == "pause_schedule":
+                return await schedule_handlers.pause_schedule(client, arguments)
+            elif name == "unpause_schedule":
+                return await schedule_handlers.unpause_schedule(client, arguments)
+            elif name == "delete_schedule":
+                return await schedule_handlers.delete_schedule(client, arguments)
+            elif name == "trigger_schedule":
+                return await schedule_handlers.trigger_schedule(client, arguments)
+            elif name == "describe_schedule":
+                return await schedule_handlers.describe_schedule(client, arguments)
 
-                else:
-                    return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}", "type": "unknown_tool"}, indent=2))]
+            else:
+                return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}", "type": "unknown_tool"}, indent=2))]
 
-            except Exception as e:
-                return format_error_response(e, name)
+        except Exception as e:
+            return format_error_response(e, name)
 
     async def run(self):
         """Run the MCP server."""
