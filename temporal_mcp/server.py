@@ -1,11 +1,11 @@
 """Main MCP Server for Temporal workflow orchestration."""
 
 import json
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import CallToolRequestParams, CallToolResult, ListToolsResult, TextContent
+from mcp.types import CallToolRequestParams, CallToolResult, ContentBlock, ListToolsResult, TextContent
 
 from .client import TemporalClientManager
 from .tools.tool_definitions import get_all_tools
@@ -62,7 +62,7 @@ class TemporalMCPServer:
     async def _call_tool(self, context: Any, params: CallToolRequestParams) -> CallToolResult:
         """Handle tool execution requests."""
         content = await self._execute_tool(params.name, params.arguments or {})
-        return CallToolResult(content=content)
+        return CallToolResult(content=cast(list[ContentBlock], content))
 
     async def _execute_tool(self, name: str, arguments: Any) -> list[TextContent]:
         """Execute a Temporal tool by name."""
