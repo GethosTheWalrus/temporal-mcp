@@ -13,7 +13,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="start_workflow",
             description="Start a new Temporal workflow execution",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "workflow_name": {"type": "string", "description": "The name of the workflow to start"},
@@ -27,7 +27,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="query_workflow",
             description="Query a running workflow for its current state",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "workflow_id": {"type": "string", "description": "The workflow execution ID to query"},
@@ -40,7 +40,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="signal_workflow",
             description="Send a signal to a running workflow",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "workflow_id": {"type": "string", "description": "The workflow execution ID to signal"},
@@ -53,22 +53,22 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="cancel_workflow",
             description="Cancel a running workflow execution",
-            inputSchema={"type": "object", "properties": {"workflow_id": {"type": "string", "description": "The workflow execution ID to cancel"}}, "required": ["workflow_id"]},
+            input_schema={"type": "object", "properties": {"workflow_id": {"type": "string", "description": "The workflow execution ID to cancel"}}, "required": ["workflow_id"]},
         ),
         Tool(
             name="get_workflow_result",
             description="Get the result of a completed workflow",
-            inputSchema={"type": "object", "properties": {"workflow_id": {"type": "string", "description": "The workflow execution ID"}}, "required": ["workflow_id"]},
+            input_schema={"type": "object", "properties": {"workflow_id": {"type": "string", "description": "The workflow execution ID"}}, "required": ["workflow_id"]},
         ),
         Tool(
             name="describe_workflow",
             description="Get detailed information about a workflow execution",
-            inputSchema={"type": "object", "properties": {"workflow_id": {"type": "string", "description": "The workflow execution ID to describe"}}, "required": ["workflow_id"]},
+            input_schema={"type": "object", "properties": {"workflow_id": {"type": "string", "description": "The workflow execution ID to describe"}}, "required": ["workflow_id"]},
         ),
         Tool(
             name="list_workflows",
             description="List workflow executions based on a query. Specify 'limit' to control the number of results (default: 100, max recommended: 1000). Use 'skip' to paginate through results.",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "List filter query (e.g., 'WorkflowType=\"MyWorkflow\"')"},
@@ -80,7 +80,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="terminate_workflow",
             description="Forcefully terminate a workflow execution",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {"workflow_id": {"type": "string", "description": "The workflow execution ID to terminate"}, "reason": {"type": "string", "description": "Reason for termination"}},
                 "required": ["workflow_id"],
@@ -89,7 +89,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="get_workflow_history",
             description="Get the complete event history of a workflow execution. Specify 'limit' to control the number of events (default: 1000).",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "workflow_id": {"type": "string", "description": "The workflow execution ID"},
@@ -101,7 +101,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="get_workflow_event",
             description="Get a single workflow history event with decoded payload fields when present",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "workflow_id": {"type": "string", "description": "The workflow execution ID"},
@@ -114,7 +114,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="start_activity",
             description="Start a new standalone Temporal activity execution",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "activity": {"type": "string", "description": "Activity type name to start"},
@@ -129,7 +129,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="execute_activity",
             description="Execute a standalone Temporal activity and wait for result",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "activity": {"type": "string", "description": "Activity type name to execute"},
@@ -144,7 +144,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="get_activity_result",
             description="Get the result of a standalone activity",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "activity_id": {"type": "string", "description": "Standalone activity execution ID"},
@@ -157,7 +157,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="describe_activity",
             description="Get detailed information about a standalone activity execution",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "activity_id": {"type": "string", "description": "Standalone activity execution ID"},
@@ -169,7 +169,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="list_activities",
             description="List standalone activity executions based on a query. Specify 'limit' to control results and 'skip' for pagination.",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "List filter query (e.g., 'TaskQueue = \"my-task-queue\"')"},
@@ -181,7 +181,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="count_activities",
             description="Count standalone activity executions matching a query",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "List filter query (e.g., 'TaskQueue = \"my-task-queue\"')"},
@@ -191,7 +191,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="cancel_activity",
             description="Cancel a running standalone activity execution",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "activity_id": {"type": "string", "description": "Standalone activity execution ID"},
@@ -203,7 +203,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="terminate_activity",
             description="Forcefully terminate a standalone activity execution",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "activity_id": {"type": "string", "description": "Standalone activity execution ID"},
@@ -216,7 +216,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="batch_signal",
             description="Send a signal to multiple workflows matching a query. Specify 'limit' to control batch size (default: 100).",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "Query to select workflows"},
@@ -230,7 +230,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="batch_cancel",
             description="Cancel multiple workflows matching a query with concurrent processing for speed. Use 'concurrency' to control parallel operations (default: 50).",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "Query to select workflows to cancel"},
@@ -243,7 +243,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="batch_terminate",
             description="Terminate multiple workflows matching a query. Specify 'limit' to control batch size (default: 100).",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "Query to select workflows to terminate"},
@@ -256,7 +256,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="batch_cancel_activities",
             description="Cancel multiple standalone activities matching a query with concurrent processing for speed. Use 'concurrency' to control parallel operations (default: 50).",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "Query to select activities to cancel"},
@@ -269,7 +269,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="batch_terminate_activities",
             description="Terminate multiple standalone activities matching a query. Specify 'limit' to control batch size (default: 100).",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "Query to select activities to terminate"},
@@ -283,7 +283,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="create_schedule",
             description="Create a new schedule for periodic workflow execution",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "schedule_id": {"type": "string", "description": "Unique identifier for the schedule"},
@@ -298,7 +298,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="list_schedules",
             description="List all schedules. Specify 'limit' to control the number of results (default: 100). Use 'skip' to paginate through results.",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "limit": {"type": "number", "description": "Maximum number of schedules to return (default: 100)"},
@@ -309,7 +309,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="pause_schedule",
             description="Pause a schedule",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {"schedule_id": {"type": "string", "description": "The schedule ID to pause"}, "note": {"type": "string", "description": "Note explaining why the schedule was paused"}},
                 "required": ["schedule_id"],
@@ -318,7 +318,7 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="unpause_schedule",
             description="Resume a paused schedule",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "schedule_id": {"type": "string", "description": "The schedule ID to unpause"},
@@ -330,22 +330,22 @@ def get_all_tools() -> list[Tool]:
         Tool(
             name="delete_schedule",
             description="Delete a schedule",
-            inputSchema={"type": "object", "properties": {"schedule_id": {"type": "string", "description": "The schedule ID to delete"}}, "required": ["schedule_id"]},
+            input_schema={"type": "object", "properties": {"schedule_id": {"type": "string", "description": "The schedule ID to delete"}}, "required": ["schedule_id"]},
         ),
         Tool(
             name="trigger_schedule",
             description="Manually trigger a scheduled workflow immediately",
-            inputSchema={"type": "object", "properties": {"schedule_id": {"type": "string", "description": "The schedule ID to trigger"}}, "required": ["schedule_id"]},
+            input_schema={"type": "object", "properties": {"schedule_id": {"type": "string", "description": "The schedule ID to trigger"}}, "required": ["schedule_id"]},
         ),
         Tool(
             name="describe_schedule",
             description="Get detailed configuration and runtime information about a schedule, including its spec, action, state, recent executions, and upcoming action times",
-            inputSchema={"type": "object", "properties": {"schedule_id": {"type": "string", "description": "The schedule ID to describe"}}, "required": ["schedule_id"]},
+            input_schema={"type": "object", "properties": {"schedule_id": {"type": "string", "description": "The schedule ID to describe"}}, "required": ["schedule_id"]},
         ),
         Tool(
             name="continue_as_new",
             description="Signal a workflow to continue as new (restart with new inputs while preserving history link)",
-            inputSchema={
+            input_schema={
                 "type": "object",
                 "properties": {
                     "workflow_id": {"type": "string", "description": "The workflow ID to continue as new"},
