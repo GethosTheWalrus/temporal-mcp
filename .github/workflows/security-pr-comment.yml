@@ -4,6 +4,8 @@ on:
   workflow_run:
     workflows:
       - Docker Scout
+      - Docker Scout PR Build
+      - Docker Scout PR Scan
       - CodeQL
       - OSV-Scanner
     types:
@@ -23,19 +25,49 @@ concurrency:
 jobs:
   update-comment:
     name: Update security scan comment
-    if: ${{ github.event.workflow_run.event == 'pull_request' }}
+    # Direct scanners are triggered by pull_request. The privileged fork-PR Scout
+    # scan is triggered by workflow_run, so admit it by trusted workflow path.
+    if: ${{ github.event.workflow_run.event == 'pull_request' || github.event.workflow_run.path == '.github/workflows/docker-scout-pr-scan.yml' }}
     runs-on: ubuntu-latest
 
     steps:
+      - name: Download Docker Scout PR result metadata
+        id: download-scout-result
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: docker-scout-pr-result
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: docker-scout-pr-result
+
       - name: Update PR comment
         uses: actions/github-script@v8
         with:
           script: |
+            const fs = require('node:fs');
             const marker = '<!-- temporal-mcp-security-summary -->';
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const run = context.payload.workflow_run;
-            let pr = run.pull_requests[0];
+            let scoutPrResult = null;
+            const scoutResultDownloadOutcome = '${{ steps.download-scout-result.outcome }}';
+            if (run.path === '.github/workflows/docker-scout-pr-scan.yml' && scoutResultDownloadOutcome === 'failure') {
+              core.warning('Docker Scout PR Scan result metadata artifact was unavailable; falling back to workflow metadata.');
+            }
+            try {
+              if (fs.existsSync('docker-scout-pr-result/metadata.json')) {
+                scoutPrResult = JSON.parse(fs.readFileSync('docker-scout-pr-result/metadata.json', 'utf8'));
+              }
+            } catch (error) {
+              core.warning(`Failed to parse Docker Scout PR result metadata: ${error.message}`);
+              scoutPrResult = null;
+            }
+            let pr = (run.pull_requests || [])[0];
+
+            if (!pr && scoutPrResult?.pr_number) {
+              pr = { number: scoutPrResult.pr_number };
+            }
 
             if (!pr) {
               const headOwner = run.head_repository?.owner?.login;
@@ -64,7 +96,7 @@ jobs:
               pull_number: prNumber,
             });
 
-            const headSha = pull.head.sha || run.head_sha || '';
+            const headSha = scoutPrResult?.head_sha || pull.head.sha || run.head_sha || '';
             const shortSha = headSha ? headSha.slice(0, 7) : 'unknown';
             const runUrl = run.html_url;
 
@@ -140,7 +172,7 @@ jobs:
               {
                 key: 'scout',
                 title: 'Docker Scout',
-                check: newestMatching(/Docker Scout/i, /Scan container image/i),
+                check: newestMatching(/Docker Scout PR Scan/i, /Docker Scout/i, /Scan container image/i, /Scan fork PR image/i),
                 toolPatterns: [/docker scout/i, /scout/i],
                 usesCodeScanning: true,
                 success: 'No open critical/high fixable container CVEs reported for this PR ref.',
@@ -214,7 +246,7 @@ jobs:
                 if (tool.check?.conclusion === 'success') return tool.success;
                 if (tool.check?.conclusion === 'skipped') return 'Scan was skipped.';
                 if (!tool.check) return 'Waiting for this scan to report.';
-                return 'No matching open code scanning alerts found for this PR ref.';
+                return 'Check did not complete successfully; open details for output.';
               }
 
               const bySeverity = alerts.reduce((counts, alert) => {
