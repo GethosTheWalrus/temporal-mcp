@@ -295,7 +295,10 @@ class TestGetWorkflowHistory:
         result = await workflow_handlers.get_workflow_history(mock_client, {"workflow_id": "test-workflow-123", "run_id": "run-xyz"})
 
         response = json.loads(result[0].text)
+        assert response["workflow_id"] == "test-workflow-123"
         assert response["run_id"] == "run-xyz"
+        assert response["events"] == []
+        assert response["count"] == 0
         mock_client.get_workflow_handle.assert_called_once_with("test-workflow-123", run_id="run-xyz")
 
     @pytest.mark.asyncio
@@ -311,7 +314,10 @@ class TestGetWorkflowHistory:
         result = await workflow_handlers.get_workflow_history(mock_client, {"workflow_id": "test-workflow-123"})
 
         response = json.loads(result[0].text)
+        assert response["workflow_id"] == "test-workflow-123"
         assert response["run_id"] is None
+        assert response["events"] == []
+        assert response["count"] == 0
         mock_client.get_workflow_handle.assert_called_once_with("test-workflow-123", run_id=None)
 
 
