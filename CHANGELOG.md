@@ -2,6 +2,35 @@
 
 <!-- version list -->
 
+## v1.9.0 (2026-07-29)
+
+### Chores
+
+- Rerun checks ([#54](https://github.com/GethosTheWalrus/temporal-mcp/pull/54),
+  [`d3aebdf`](https://github.com/GethosTheWalrus/temporal-mcp/commit/d3aebdfe14a465407878dabf8f3bec839f32b02c))
+
+- Trigger updated security workflows
+  ([#54](https://github.com/GethosTheWalrus/temporal-mcp/pull/54),
+  [`d3aebdf`](https://github.com/GethosTheWalrus/temporal-mcp/commit/d3aebdfe14a465407878dabf8f3bec839f32b02c))
+
+### Continuous Integration
+
+- Add consolidated security PR comment
+  ([`4ea2bed`](https://github.com/GethosTheWalrus/temporal-mcp/commit/4ea2bedb99a361e1f8ebd63aed2941aef5cd73ce))
+
+- Scan fork PR images with Docker Scout
+  ([`7acdfef`](https://github.com/GethosTheWalrus/temporal-mcp/commit/7acdfeff631037b508452448d34c2db41e632b9d))
+
+- Skip Docker Scout when PR secrets are unavailable
+  ([`a76fd6a`](https://github.com/GethosTheWalrus/temporal-mcp/commit/a76fd6a307aaaee7a90358b4f976602882e0c007))
+
+### Features
+
+- Add optional run_id to get_workflow_history
+  ([#54](https://github.com/GethosTheWalrus/temporal-mcp/pull/54),
+  [`d3aebdf`](https://github.com/GethosTheWalrus/temporal-mcp/commit/d3aebdfe14a465407878dabf8f3bec839f32b02c))
+
+
 ## v1.8.0 (2026-07-28)
 
 ### Bug Fixes
