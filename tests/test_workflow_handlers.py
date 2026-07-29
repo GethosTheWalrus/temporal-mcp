@@ -282,6 +282,44 @@ class TestGetWorkflowHistory:
         assert "__raw__" not in failed_attrs
         assert "result" not in failed_attrs
 
+    @pytest.mark.asyncio
+    async def test_get_workflow_history_passes_run_id_when_provided(self, mock_client):
+        async def mock_fetch_history_events():
+            if False:
+                yield None
+
+        mock_handle = AsyncMock()
+        mock_handle.fetch_history_events = mock_fetch_history_events
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+
+        result = await workflow_handlers.get_workflow_history(mock_client, {"workflow_id": "test-workflow-123", "run_id": "run-xyz"})
+
+        response = json.loads(result[0].text)
+        assert response["workflow_id"] == "test-workflow-123"
+        assert response["run_id"] == "run-xyz"
+        assert response["events"] == []
+        assert response["count"] == 0
+        mock_client.get_workflow_handle.assert_called_once_with("test-workflow-123", run_id="run-xyz")
+
+    @pytest.mark.asyncio
+    async def test_get_workflow_history_defaults_run_id_to_none(self, mock_client):
+        async def mock_fetch_history_events():
+            if False:
+                yield None
+
+        mock_handle = AsyncMock()
+        mock_handle.fetch_history_events = mock_fetch_history_events
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+
+        result = await workflow_handlers.get_workflow_history(mock_client, {"workflow_id": "test-workflow-123"})
+
+        response = json.loads(result[0].text)
+        assert response["workflow_id"] == "test-workflow-123"
+        assert response["run_id"] is None
+        assert response["events"] == []
+        assert response["count"] == 0
+        mock_client.get_workflow_handle.assert_called_once_with("test-workflow-123", run_id=None)
+
 
 class TestGetWorkflowEvent:
     @pytest.mark.asyncio
