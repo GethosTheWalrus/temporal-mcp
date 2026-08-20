@@ -2,6 +2,40 @@
 
 <!-- version list -->
 
+## v1.9.1 (2026-08-20)
+
+### Bug Fixes
+
+- Resolve container scan findings ([#66](https://github.com/GethosTheWalrus/temporal-mcp/pull/66),
+  [`ca5c2f9`](https://github.com/GethosTheWalrus/temporal-mcp/commit/ca5c2f9c01adf1e10784ee8031121d397fec8b92))
+
+### Chores
+
+- **deps**: Bump actions/download-artifact from 4 to 8
+  ([#61](https://github.com/GethosTheWalrus/temporal-mcp/pull/61),
+  [`a958b04`](https://github.com/GethosTheWalrus/temporal-mcp/commit/a958b0491c5bd0b52de6b175dedec70a0cc1bb4d))
+
+- **deps**: Bump actions/github-script from 8 to 9
+  ([#60](https://github.com/GethosTheWalrus/temporal-mcp/pull/60),
+  [`9d6b7b9`](https://github.com/GethosTheWalrus/temporal-mcp/commit/9d6b7b94b7d067208e3df605fa01232d9e040589))
+
+- **deps**: Bump google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml
+  ([#64](https://github.com/GethosTheWalrus/temporal-mcp/pull/64),
+  [`ec64dbf`](https://github.com/GethosTheWalrus/temporal-mcp/commit/ec64dbf85c53337c3cd0e1bb321b806d7f481074))
+
+- **deps-dev**: Update filelock requirement from >=3.32.0 to >=3.32.2
+  ([#59](https://github.com/GethosTheWalrus/temporal-mcp/pull/59),
+  [`bb6c1a7`](https://github.com/GethosTheWalrus/temporal-mcp/commit/bb6c1a76f266fcf9bea8ed34a9f2300cbf7ae974))
+
+- **deps-dev**: Update filelock requirement from >=3.32.2 to >=3.32.3
+  ([#63](https://github.com/GethosTheWalrus/temporal-mcp/pull/63),
+  [`c19f8e6`](https://github.com/GethosTheWalrus/temporal-mcp/commit/c19f8e6bcfcb33a96c21cae541585e76daf595fc))
+
+- **deps-dev**: Update pre-commit requirement from >=4.6.1 to >=4.6.2
+  ([#62](https://github.com/GethosTheWalrus/temporal-mcp/pull/62),
+  [`9dc40ee`](https://github.com/GethosTheWalrus/temporal-mcp/commit/9dc40ee32dfd4ae58d1ad45b541d367c77fbb513))
+
+
 ## v1.9.0 (2026-07-29)
 
 ### Chores
