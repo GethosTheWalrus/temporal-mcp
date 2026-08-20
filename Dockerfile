@@ -22,10 +22,13 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Upgrade packaging tools before dependency install
 RUN pip install --no-cache-dir --upgrade "pip>=26.0" "wheel>=0.46.2" "setuptools>=75.0"
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip uninstall --yes pip setuptools wheel
 
 FROM python:3.14-alpine AS runtime
 
 WORKDIR /app
+
+RUN python -m pip uninstall --yes pip
 
 RUN apk add --no-cache \
     libgcc \
