@@ -13,4 +13,4 @@ pre-commit>=4.6.2
 
 # Security floors for transitive development dependencies
 filelock>=3.32.3
-pygments>=2.20.0
+pygments>=2.21.0
