@@ -1,7 +1,8 @@
 """Temporal client management and connection handling."""
 
+import asyncio
 import sys
-from typing import Optional
+from typing import Optional, Sequence
 
 from temporalio.client import Client, TLSConfig
 
@@ -17,6 +18,7 @@ class TemporalClientManager:
         tls_client_cert_path: Optional[str] = None,
         tls_client_key_path: Optional[str] = None,
         api_key: Optional[str] = None,
+        allowed_namespaces: Optional[Sequence[str]] = None,
     ):
         """Initialize the Temporal client manager.
 
@@ -27,14 +29,20 @@ class TemporalClientManager:
             tls_client_cert_path: Path to the TLS client certificate file (for mTLS / Temporal Cloud)
             tls_client_key_path: Path to the TLS client private key file (for mTLS / Temporal Cloud)
             api_key: API key for Temporal Cloud authentication
+            allowed_namespaces: Namespaces callers may select. None permits only the
+                configured default; ["*"] permits any namespace.
         """
         self.temporal_host = temporal_host
-        self.namespace = namespace
+        if not isinstance(namespace, str) or not namespace.strip():
+            raise ValueError("Configured namespace must be a non-empty string")
+        self.namespace = namespace.strip()
         self.tls_enabled = tls_enabled
         self.tls_client_cert_path = tls_client_cert_path
         self.tls_client_key_path = tls_client_key_path
         self.api_key = api_key
+        self.allowed_namespaces = self._normalize_allowed_namespaces(allowed_namespaces)
         self.client: Optional[Client] = None
+        self._connect_lock = asyncio.Lock()
 
     async def connect(self) -> Client:
         """Connect to Temporal server.
@@ -45,9 +53,14 @@ class TemporalClientManager:
         Raises:
             Exception: If connection fails
         """
-        if not self.client:
-            tls_config = self._determine_tls_config()
+        if self.client:
+            return self.client
 
+        async with self._connect_lock:
+            if self.client:
+                return self.client
+
+            tls_config = self._determine_tls_config()
             self._log_connection_info(tls_config)
 
             try:
@@ -68,14 +81,29 @@ class TemporalClientManager:
         return self.client
 
     async def disconnect(self):
-        """Disconnect from Temporal server."""
-        if self.client:
-            try:
-                await self.client.close()
-            except Exception as e:
-                print(f"Error closing Temporal client: {e}", file=sys.stderr)
-            finally:
-                self.client = None
+        """Release the Temporal client and its shared service connection."""
+        self.client = None
+
+    async def get_client(self, namespace: Optional[str] = None) -> Client:
+        """Return a client bound to an allowed namespace."""
+        selected_namespace = self.resolve_namespace(namespace)
+        base_client = await self.connect()
+        if selected_namespace == self.namespace:
+            return base_client
+
+        config = base_client.config()
+        config["namespace"] = selected_namespace
+        return Client(**config)
+
+    def resolve_namespace(self, namespace: Optional[str] = None) -> str:
+        """Resolve and authorize a request-specific namespace."""
+        selected_namespace = self.namespace if namespace is None else namespace
+        if not isinstance(selected_namespace, str) or not selected_namespace.strip():
+            raise ValueError("Namespace must be a non-empty string")
+        selected_namespace = selected_namespace.strip()
+        if self.allowed_namespaces is not None and selected_namespace not in self.allowed_namespaces:
+            raise ValueError(f"Namespace '{selected_namespace}' is not allowed")
+        return selected_namespace
 
     def ensure_connected(self) -> Client:
         """Ensure client is connected.
@@ -89,6 +117,28 @@ class TemporalClientManager:
         if not self.client:
             raise RuntimeError("Not connected to Temporal server. Connection may have failed or been lost.")
         return self.client
+
+    def _normalize_allowed_namespaces(self, allowed_namespaces: Optional[Sequence[str]]) -> Optional[frozenset[str]]:
+        """Normalize namespace policy; None represents an unrestricted policy."""
+        if allowed_namespaces is None:
+            return frozenset({self.namespace})
+        if isinstance(allowed_namespaces, str):
+            raise TypeError("allowed_namespaces must be a sequence of namespace strings")
+
+        if any(not isinstance(namespace, str) for namespace in allowed_namespaces):
+            raise ValueError("Allowed namespaces must contain only strings")
+        normalized = [namespace.strip() for namespace in allowed_namespaces]
+        if not normalized or any(not namespace for namespace in normalized):
+            raise ValueError("Allowed namespaces must contain only non-empty values")
+        if "*" in normalized:
+            if len(normalized) != 1:
+                raise ValueError("'*' cannot be combined with explicit allowed namespaces")
+            return None
+
+        result = frozenset(normalized)
+        if self.namespace not in result:
+            raise ValueError(f"Configured namespace '{self.namespace}' must be included in allowed namespaces")
+        return result
 
     def _load_client_certs(self) -> tuple[Optional[bytes], Optional[bytes]]:
         """Load mTLS client certificate and key from disk.

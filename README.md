@@ -119,12 +119,15 @@ Recommended when running from PyPI via [`uvx`](https://docs.astral.sh/uv/guides/
 |--------|-------------|----------------------|---------|
 | Temporal host | `--host` | `TEMPORAL_HOST` | `localhost:7233` |
 | Namespace | `--namespace` | `TEMPORAL_NAMESPACE` | `default` |
+| Allowed namespaces | — | `TEMPORAL_ALLOWED_NAMESPACES` | configured namespace only |
 | TLS | `--tls-enabled` | `TEMPORAL_TLS_ENABLED` | auto-detect |
 | mTLS cert path | `--tls-cert` | `TEMPORAL_TLS_CLIENT_CERT_PATH` | — |
 | mTLS key path | `--tls-key` | `TEMPORAL_TLS_CLIENT_KEY_PATH` | — |
 | API key | `--api-key` | `TEMPORAL_API_KEY` | — |
 
 CLI arguments take precedence over environment variables. When `TEMPORAL_API_KEY` is set, TLS is enabled automatically. When mTLS cert/key paths are provided, TLS is also enabled automatically.
+
+Every tool accepts an optional `namespace` argument. If omitted, the server uses `--namespace`, then `TEMPORAL_NAMESPACE`, then `default`. Runtime overrides are disabled by default: set `TEMPORAL_ALLOWED_NAMESPACES` to a comma-separated allowlist such as `default,payments`, or set it to `*` to permit any namespace reachable through the configured Temporal host and credentials. A finite allowlist must include the configured default namespace.
 
 ## Development
 

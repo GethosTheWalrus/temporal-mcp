@@ -1,15 +1,17 @@
 """Tool definitions for the Temporal MCP server."""
 
+from typing import Iterable, Optional
+
 from mcp.types import Tool
 
 
-def get_all_tools() -> list[Tool]:
+def get_all_tools(allowed_namespaces: Optional[Iterable[str]] = None) -> list[Tool]:
     """Get all available Temporal tools.
 
     Returns:
         List of Tool definitions
     """
-    return [
+    tools = [
         Tool(
             name="start_workflow",
             description="Start a new Temporal workflow execution",
@@ -357,3 +359,16 @@ def get_all_tools() -> list[Tool]:
             },
         ),
     ]
+
+    namespace_schema = {
+        "type": "string",
+        "minLength": 1,
+        "description": "Temporal namespace for this operation; omit to use the server default",
+    }
+    if allowed_namespaces is not None:
+        namespace_schema["enum"] = sorted(allowed_namespaces)
+    for tool in tools:
+        input_schema = getattr(tool, "input_schema", None) or tool.inputSchema
+        input_schema["properties"]["namespace"] = namespace_schema.copy()
+
+    return tools
