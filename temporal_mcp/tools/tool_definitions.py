@@ -368,7 +368,7 @@ def get_all_tools(allowed_namespaces: Optional[Iterable[str]] = None) -> list[To
     if allowed_namespaces is not None:
         namespace_schema["enum"] = sorted(allowed_namespaces)
     for tool in tools:
-        input_schema = getattr(tool, "input_schema", None) or tool.inputSchema
+        input_schema = tool.input_schema
         input_schema["properties"]["namespace"] = namespace_schema.copy()
 
     return tools
