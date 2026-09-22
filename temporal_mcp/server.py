@@ -66,19 +66,24 @@ class TemporalMCPServer:
 
     async def _call_tool(self, context: Any, params: CallToolRequestParams) -> CallToolResult:
         """Handle tool execution requests."""
-        content = list(await self._execute_tool(params.name, params.arguments or {}))
-        return CallToolResult(content=content)
+        result = await self._execute_tool(params.name, params.arguments or {})
+        if isinstance(result, CallToolResult):
+            return result
+        return CallToolResult(content=list(result))
 
-    async def _execute_tool(self, name: str, arguments: Any) -> Sequence[ContentBlock]:
+    async def _execute_tool(self, name: str, arguments: Any) -> Sequence[ContentBlock] | CallToolResult:
         """Execute a Temporal tool by name."""
         handler_arguments = dict(arguments)
         requested_namespace = handler_arguments.pop("namespace", None)
 
         try:
+            # Only omission may select the default; JSON null must fail closed.
+            if "namespace" in arguments and requested_namespace is None:
+                raise ValueError("Namespace must be a non-empty string")
             namespace = self.client_manager.resolve_namespace(requested_namespace)
         except Exception as e:
             print(f"Rejected tool {name} namespace={requested_namespace!r}: {e}", file=sys.stderr)
-            return format_error_response(e, name)
+            return CallToolResult(content=list(format_error_response(e, name)), is_error=True)
 
         try:
             client = await self.client_manager.get_client(namespace)
