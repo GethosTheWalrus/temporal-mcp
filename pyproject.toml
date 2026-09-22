@@ -22,9 +22,14 @@ classifiers = [
 ]
 dependencies = [
     "temporalio>=1.5.0",
-    "mcp>=2.0.0",
+    # Keep the tested 2.0/2.1 SDK API: 2.2 changes protocol model wrappers.
+    # Remove the cap after validating stdio/tool dispatch against the new types.
+    "mcp>=2.0.0,<2.2.0",
     "idna>=3.15",
     "python-multipart>=0.0.31",
+    # GHSA-h4x7-gw46-3wm6, GHSA-pf96-p4fj-6566, GHSA-8xx6-hgc6-gc2m
+    "httpx2>=2.12.0",
+    "httpcore2>=2.10.0",
     "asyncio-atexit>=1.0.1",
 ]
 

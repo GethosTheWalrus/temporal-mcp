@@ -1,5 +1,6 @@
 """Tests for TemporalClientManager — TLS, mTLS, and API key auth."""
 
+import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from temporalio.client import TLSConfig
@@ -105,14 +106,15 @@ class TestDetermineTlsConfig:
 class TestConnect:
     @pytest.mark.asyncio
     async def test_connect_success(self):
-        mgr = TemporalClientManager(temporal_host="localhost:7233")
+        mgr = TemporalClientManager(temporal_host="localhost:7233", namespace="payments")
         mock_client = AsyncMock()
 
-        with patch("temporal_mcp.client.Client.connect", return_value=mock_client):
+        with patch("temporal_mcp.client.Client.connect", return_value=mock_client) as mock_connect:
             client = await mgr.connect()
 
         assert client is mock_client
         assert mgr.client is mock_client
+        assert mock_connect.call_args.kwargs["namespace"] == "payments"
 
     @pytest.mark.asyncio
     async def test_connect_reuses_existing_client(self):
@@ -130,6 +132,21 @@ class TestConnect:
         with patch("temporal_mcp.client.Client.connect", side_effect=Exception("connection refused")):
             with pytest.raises(Exception, match="connection refused"):
                 await mgr.connect()
+
+    @pytest.mark.asyncio
+    async def test_concurrent_connect_creates_one_connection(self):
+        mgr = TemporalClientManager()
+        mock_client = MagicMock()
+
+        async def connect(*args, **kwargs):
+            await asyncio.sleep(0)
+            return mock_client
+
+        with patch("temporal_mcp.client.Client.connect", side_effect=connect) as mock_connect:
+            clients = await asyncio.gather(mgr.connect(), mgr.connect(), mgr.connect())
+
+        assert clients == [mock_client, mock_client, mock_client]
+        mock_connect.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_connect_passes_api_key(self):
@@ -168,16 +185,70 @@ class TestConnect:
             assert tls.client_private_key == b"KEY"
 
 
+class TestNamespaceClients:
+    @pytest.mark.asyncio
+    async def test_override_client_shares_base_service_client(self):
+        mgr = TemporalClientManager(namespace="default", allowed_namespaces=["default", "payments"])
+        service_client = MagicMock()
+        base_client = MagicMock()
+        base_client.config.return_value = {
+            "service_client": service_client,
+            "namespace": "default",
+        }
+        mgr.client = base_client
+
+        with patch("temporal_mcp.client.Client") as client_class:
+            override_client = await mgr.get_client("payments")
+
+        assert override_client is client_class.return_value
+        client_class.assert_called_once_with(service_client=service_client, namespace="payments")
+
+    @pytest.mark.asyncio
+    async def test_default_namespace_reuses_base_client(self):
+        mgr = TemporalClientManager(namespace="default")
+        base_client = MagicMock()
+        mgr.client = base_client
+
+        assert await mgr.get_client() is base_client
+
+    def test_unset_allowlist_only_permits_default(self):
+        mgr = TemporalClientManager(namespace="production")
+
+        assert mgr.resolve_namespace() == "production"
+        with pytest.raises(ValueError, match="not allowed"):
+            mgr.resolve_namespace("payments")
+
+    def test_wildcard_permits_any_non_empty_namespace(self):
+        mgr = TemporalClientManager(allowed_namespaces=["*"])
+
+        assert mgr.resolve_namespace("payments") == "payments"
+        with pytest.raises(ValueError, match="non-empty"):
+            mgr.resolve_namespace("")
+
+    def test_finite_allowlist_must_include_default(self):
+        with pytest.raises(ValueError, match="must be included"):
+            TemporalClientManager(namespace="default", allowed_namespaces=["payments"])
+
+    def test_allowlist_is_trimmed_and_deduplicated(self):
+        mgr = TemporalClientManager(namespace="default", allowed_namespaces=[" default ", "payments", "payments"])
+
+        assert mgr.allowed_namespaces == frozenset({"default", "payments"})
+
+    @pytest.mark.parametrize("allowed_namespaces", [[], [""], ["default", ""], ["*", "default"]])
+    def test_invalid_allowlist_rejected(self, allowed_namespaces):
+        with pytest.raises(ValueError):
+            TemporalClientManager(allowed_namespaces=allowed_namespaces)
+
+
 class TestDisconnectAndEnsureConnected:
     @pytest.mark.asyncio
-    async def test_disconnect_closes_client(self):
+    async def test_disconnect_releases_client(self):
         mgr = TemporalClientManager()
-        mock_client = AsyncMock()
+        mock_client = MagicMock()
         mgr.client = mock_client
 
         await mgr.disconnect()
 
-        mock_client.close.assert_called_once()
         assert mgr.client is None
 
     @pytest.mark.asyncio
