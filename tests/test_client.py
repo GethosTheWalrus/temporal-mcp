@@ -3,7 +3,8 @@
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from temporalio.client import TLSConfig
+from temporalio.client import Client, TLSConfig
+from temporalio.service import ServiceClient
 
 from temporal_mcp.client import TemporalClientManager
 
@@ -186,6 +187,32 @@ class TestConnect:
 
 
 class TestNamespaceClients:
+    @pytest.mark.asyncio
+    async def test_concurrent_namespace_clients_share_connection_without_mutating_default(self):
+        mgr = TemporalClientManager(namespace="production", allowed_namespaces=["production", "payments", "reports"])
+        service_client = MagicMock(spec=ServiceClient)
+        base_client = Client(service_client, namespace="production")
+        original_config = base_client.config()
+
+        async def connect(*args, **kwargs):
+            # Yield so the other callers contend for initial connection setup.
+            await asyncio.sleep(0)
+            return base_client
+
+        namespaces = [None, "payments", "reports", "production", "payments", None]
+        with patch("temporal_mcp.client.Client.connect", side_effect=connect) as mock_connect:
+            clients = await asyncio.gather(*(mgr.get_client(namespace) for namespace in namespaces))
+            default_client = await mgr.get_client()
+
+        mock_connect.assert_awaited_once()
+        assert [client.namespace for client in clients] == ["production", "payments", "reports", "production", "payments", "production"]
+        assert all(client.service_client is service_client for client in clients)
+        assert all(client is base_client for client, namespace in zip(clients, namespaces) if namespace in (None, "production"))
+        assert default_client is base_client
+        assert mgr.namespace == "production"
+        assert base_client.namespace == "production"
+        assert base_client.config() == original_config
+
     @pytest.mark.asyncio
     async def test_override_client_shares_base_service_client(self):
         mgr = TemporalClientManager(namespace="default", allowed_namespaces=["default", "payments"])

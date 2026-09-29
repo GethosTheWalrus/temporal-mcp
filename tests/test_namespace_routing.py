@@ -1,13 +1,55 @@
 """Tests for request-specific Temporal namespace routing."""
 
+import asyncio
 import json
-from unittest.mock import AsyncMock, patch
+from collections import Counter
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from mcp.types import CallToolRequestParams
+from temporalio.client import Client
+from temporalio.service import ServiceClient
 
 from temporal_mcp.server import TemporalMCPServer
 from temporal_mcp.tools.tool_definitions import get_all_tools
+
+
+@pytest.mark.asyncio
+async def test_concurrent_destructive_calls_send_correct_namespace_to_temporal():
+    server = TemporalMCPServer(namespace="production", allowed_namespaces=["production", "payments"])
+    service_client = MagicMock(spec=ServiceClient)
+    service_client.config = MagicMock(identity="namespace-routing-test")
+
+    async def terminate(request, **kwargs):
+        # Keep RPCs in flight together to expose shared-client namespace mutation.
+        await asyncio.sleep(0)
+
+    rpc = AsyncMock(side_effect=terminate)
+    service_client.workflow_service = MagicMock(terminate_workflow_execution=rpc)
+    base_client = Client(service_client, namespace="production")
+    server.client_manager.client = base_client
+    namespaces = ["payments", None, "production", "payments", None]
+    params = [
+        CallToolRequestParams(
+            name="terminate_workflow",
+            arguments={"workflow_id": "same-id", **({"namespace": namespace} if namespace is not None else {})},
+        )
+        for namespace in namespaces
+    ]
+
+    results = await asyncio.gather(*(server._call_tool(None, request) for request in params))
+    # Also verify omission after all overrides have completed.
+    results.append(await server._call_tool(None, CallToolRequestParams(name="terminate_workflow", arguments={"workflow_id": "same-id"})))
+
+    assert all(not result.is_error for result in results)
+    assert all(json.loads(result.content[0].text)["status"] == "terminated" for result in results)
+    assert rpc.await_count == len(params) + 1
+    requests = [call.args[0] for call in rpc.await_args_list]
+    assert all(request.workflow_execution.workflow_id == "same-id" for request in requests)
+    assert Counter(request.namespace for request in requests[:-1]) == Counter(namespace or "production" for namespace in namespaces)
+    assert requests[-1].namespace == "production"
+    assert base_client.namespace == "production"
+    assert server.client_manager.client is base_client
 
 
 @pytest.mark.asyncio
