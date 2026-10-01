@@ -30,7 +30,7 @@ WORKDIR /app
 
 RUN python -m pip uninstall --yes pip
 
-RUN apk add --no-cache \
+RUN apk upgrade --no-cache && apk add --no-cache \
     libgcc \
     libstdc++
 

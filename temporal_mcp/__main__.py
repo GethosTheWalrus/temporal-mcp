@@ -89,6 +89,8 @@ def main():
 
     # API key authentication (for Temporal Cloud)
     api_key = args.api_key or os.environ.get("TEMPORAL_API_KEY")
+    allowed_namespaces_raw = os.environ.get("TEMPORAL_ALLOWED_NAMESPACES")
+    allowed_namespaces = allowed_namespaces_raw.split(",") if allowed_namespaces_raw is not None else None
 
     print(
         f"Starting MCP server with TEMPORAL_HOST={temporal_host}, TLS={tls_enabled}",
@@ -108,6 +110,7 @@ def main():
         tls_client_cert_path=tls_client_cert_path,
         tls_client_key_path=tls_client_key_path,
         api_key=api_key,
+        allowed_namespaces=allowed_namespaces,
     )
     asyncio.run(server.run())
 

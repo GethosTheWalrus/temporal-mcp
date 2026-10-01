@@ -166,6 +166,14 @@ class TestEnvVarFallback:
         kwargs = _run_main([], env={"TEMPORAL_API_KEY": "env-secret"})
         assert kwargs["api_key"] == "env-secret"
 
+    def test_allowed_namespaces_from_env(self):
+        kwargs = _run_main([], env={"TEMPORAL_ALLOWED_NAMESPACES": "default,payments"})
+        assert kwargs["allowed_namespaces"] == ["default", "payments"]
+
+    def test_allowed_namespaces_unset(self):
+        kwargs = _run_main([], env={})
+        assert kwargs["allowed_namespaces"] is None
+
 
 # ---------------------------------------------------------------------------
 # CLI args take precedence over env vars
