@@ -2,6 +2,80 @@
 
 <!-- version list -->
 
+## v1.10.0 (2026-10-01)
+
+### Bug Fixes
+
+- Reject null namespaces at MCP boundary
+  ([#76](https://github.com/GethosTheWalrus/temporal-mcp/pull/76),
+  [`1fd9290`](https://github.com/GethosTheWalrus/temporal-mcp/commit/1fd9290492316435b94a98db93b2bde85e7f5129))
+
+- Resolve container and dependency vulnerabilities
+  ([#76](https://github.com/GethosTheWalrus/temporal-mcp/pull/76),
+  [`1fd9290`](https://github.com/GethosTheWalrus/temporal-mcp/commit/1fd9290492316435b94a98db93b2bde85e7f5129))
+
+- Use MCP 2 tool schema field ([#76](https://github.com/GethosTheWalrus/temporal-mcp/pull/76),
+  [`1fd9290`](https://github.com/GethosTheWalrus/temporal-mcp/commit/1fd9290492316435b94a98db93b2bde85e7f5129))
+
+### Chores
+
+- **deps**: Bump actions/upload-artifact from 4 to 7
+  ([#67](https://github.com/GethosTheWalrus/temporal-mcp/pull/67),
+  [`3f03e98`](https://github.com/GethosTheWalrus/temporal-mcp/commit/3f03e981bdde7eecbb172b09baf2ec9da48fb22a))
+
+- **deps**: Bump google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml
+  ([#79](https://github.com/GethosTheWalrus/temporal-mcp/pull/79),
+  [`b638f3d`](https://github.com/GethosTheWalrus/temporal-mcp/commit/b638f3d1285c5540cfe82d96ea2aa2a0032f904d))
+
+- **deps**: Bump google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml
+  ([#71](https://github.com/GethosTheWalrus/temporal-mcp/pull/71),
+  [`56ddf3b`](https://github.com/GethosTheWalrus/temporal-mcp/commit/56ddf3b87019eddabcbd652ce1594afb3b87e22f))
+
+- **deps**: Bump google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml
+  ([#70](https://github.com/GethosTheWalrus/temporal-mcp/pull/70),
+  [`b785a67`](https://github.com/GethosTheWalrus/temporal-mcp/commit/b785a67d609654b6057c079900007b21368f2a17))
+
+- **deps-dev**: Update filelock requirement from >=3.32.3 to >=3.32.4
+  ([#72](https://github.com/GethosTheWalrus/temporal-mcp/pull/72),
+  [`336b691`](https://github.com/GethosTheWalrus/temporal-mcp/commit/336b6911eeab81670a09cf13fa97f6a39f6cf0eb))
+
+- **deps-dev**: Update filelock requirement from >=3.32.4 to >=3.32.5
+  ([#74](https://github.com/GethosTheWalrus/temporal-mcp/pull/74),
+  [`d2020f6`](https://github.com/GethosTheWalrus/temporal-mcp/commit/d2020f6f74d84cb7cee994aa7f6cf940b412e623))
+
+- **deps-dev**: Update filelock requirement from >=3.32.5 to >=3.32.6
+  ([#75](https://github.com/GethosTheWalrus/temporal-mcp/pull/75),
+  [`bcbe4f6`](https://github.com/GethosTheWalrus/temporal-mcp/commit/bcbe4f6fab173c8a97725d5033add378191c940d))
+
+- **deps-dev**: Update filelock requirement from >=3.32.6 to >=4.0.0
+  ([#80](https://github.com/GethosTheWalrus/temporal-mcp/pull/80),
+  [`9a791f0`](https://github.com/GethosTheWalrus/temporal-mcp/commit/9a791f019eacf758db7fad2d798f2ea8d6f6b9d0))
+
+- **deps-dev**: Update filelock requirement from >=4.0.0 to >=4.0.3
+  ([#82](https://github.com/GethosTheWalrus/temporal-mcp/pull/82),
+  [`bebc55f`](https://github.com/GethosTheWalrus/temporal-mcp/commit/bebc55fc9c4984f079a785904a1dc2f4ac2eb832))
+
+- **deps-dev**: Update mypy requirement from >=2.3.0 to >=2.3.1
+  ([#69](https://github.com/GethosTheWalrus/temporal-mcp/pull/69),
+  [`b869759`](https://github.com/GethosTheWalrus/temporal-mcp/commit/b8697590bfc0a8e7c02f8f5f80b8a252545ed11e))
+
+- **deps-dev**: Update pygments requirement from >=2.20.0 to >=2.21.0
+  ([#68](https://github.com/GethosTheWalrus/temporal-mcp/pull/68),
+  [`c666663`](https://github.com/GethosTheWalrus/temporal-mcp/commit/c66666369c0e0db6d5366ea8a9a6e3d8d3128290))
+
+### Features
+
+- Support runtime Temporal namespaces
+  ([#76](https://github.com/GethosTheWalrus/temporal-mcp/pull/76),
+  [`1fd9290`](https://github.com/GethosTheWalrus/temporal-mcp/commit/1fd9290492316435b94a98db93b2bde85e7f5129))
+
+### Testing
+
+- Verify concurrent namespace isolation with real SDK clients
+  ([#76](https://github.com/GethosTheWalrus/temporal-mcp/pull/76),
+  [`1fd9290`](https://github.com/GethosTheWalrus/temporal-mcp/commit/1fd9290492316435b94a98db93b2bde85e7f5129))
+
+
 ## v1.9.1 (2026-08-20)
 
 ### Bug Fixes
