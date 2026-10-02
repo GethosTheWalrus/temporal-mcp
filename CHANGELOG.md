@@ -2,6 +2,29 @@
 
 <!-- version list -->
 
+## v1.10.1 (2026-10-02)
+
+### Bug Fixes
+
+- Auto-merge Dependabot updates and dispatch releases with GITHUB_TOKEN
+  ([#84](https://github.com/GethosTheWalrus/temporal-mcp/pull/84),
+  [`fdc6690`](https://github.com/GethosTheWalrus/temporal-mcp/commit/fdc66900284de6c4d6a8e14deac63b08702192d1))
+
+- Dispatch releases after token-only Dependabot merges
+  ([#84](https://github.com/GethosTheWalrus/temporal-mcp/pull/84),
+  [`fdc6690`](https://github.com/GethosTheWalrus/temporal-mcp/commit/fdc66900284de6c4d6a8e14deac63b08702192d1))
+
+- Gate Dependabot merges on successful CI
+  ([#84](https://github.com/GethosTheWalrus/temporal-mcp/pull/84),
+  [`fdc6690`](https://github.com/GethosTheWalrus/temporal-mcp/commit/fdc66900284de6c4d6a8e14deac63b08702192d1))
+
+### Documentation
+
+- Remove Dependabot token setup document
+  ([#84](https://github.com/GethosTheWalrus/temporal-mcp/pull/84),
+  [`fdc6690`](https://github.com/GethosTheWalrus/temporal-mcp/commit/fdc66900284de6c4d6a8e14deac63b08702192d1))
+
+
 ## v1.10.0 (2026-10-01)
 
 ### Bug Fixes
