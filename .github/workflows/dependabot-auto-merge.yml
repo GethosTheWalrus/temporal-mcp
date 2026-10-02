@@ -1,18 +1,40 @@
 name: Dependabot Auto-merge
 
-on: pull_request
+on:
+  workflow_run:
+    workflows: [Tests, Lint & Type Check, Security, CodeQL, OSV-Scanner, Docker Scout]
+    types: [completed]
+  workflow_dispatch:
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
 
+concurrency:
+  group: dependabot-auto-merge
+  cancel-in-progress: false
+
 jobs:
   auto-merge:
-    name: Enable auto-merge
+    name: Merge after CI passes
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     steps:
-      - name: Enable auto-merge
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr merge --auto --squash "${{ github.event.pull_request.number }}" --repo ${{ github.repository }}
+      # Only load trusted default-branch code, never a PR checkout or artifact.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Test merge eligibility guards
+        run: node --test .github/scripts/dependabot-auto-merge.test.cjs
+      - name: Merge eligible Dependabot PRs
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const merge = require('./.github/scripts/dependabot-auto-merge.cjs');
+            await merge({ github, context, core });
