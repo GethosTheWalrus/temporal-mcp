@@ -17,6 +17,7 @@ function fixture() {
   const files = [{ filename: 'pyproject.toml' }];
   const merges = [];
   const warnings = [];
+  const dispatches = [];
   const github = {
     rest: {
       pulls: {
@@ -32,15 +33,18 @@ function fixture() {
         assert.equal(args.head_sha, 'current-head');
         assert.equal(args.event, 'pull_request');
         return runs;
+      }, createWorkflowDispatch: async (args) => {
+        assert.ok(merges.length > 0, 'Release must follow a successful merge');
+        dispatches.push(args);
       } },
     },
     paginate: async (method, args) => method(args),
   };
   const options = {
-    github, context: { repo: { owner: 'owner', repo: 'repo' } }, hasMergeToken: false,
+    github, context: { repo: { owner: 'owner', repo: 'repo' } },
     core: { info() {}, warning: (message) => warnings.push(message), setFailed: assert.fail },
   };
-  return { pull, runs, files, merges, warnings, options };
+  return { pull, runs, files, merges, warnings, dispatches, options };
 }
 
 test('merges a fully checked Dependabot head with SHA protection', async () => {
@@ -49,6 +53,9 @@ test('merges a fully checked Dependabot head with SHA protection', async () => {
   assert.equal(f.merges.length, 1);
   assert.equal(f.merges[0].sha, 'current-head');
   assert.equal(f.merges[0].merge_method, 'squash');
+  assert.deepEqual(f.dispatches, [{
+    owner: 'owner', repo: 'repo', workflow_id: 'release.yml', ref: 'main',
+  }]);
 });
 
 for (const conclusion of ['failure', 'cancelled', 'skipped', null]) {
@@ -84,15 +91,44 @@ test('ignores humans, forks, drafts, and closed PRs', async () => {
   }
 });
 
-test('workflow updates need the dedicated token, including renamed files', async () => {
+test('workflow updates require manual merging, including renamed files', async () => {
   for (const renamed of [true, false]) {
-    for (const hasMergeToken of [true, false]) {
-      const f = fixture();
-      f.files[0][renamed ? 'previous_filename' : 'filename'] = '.github/workflows/test.yml';
-      f.options.hasMergeToken = hasMergeToken;
-      await merge(f.options);
-      assert.equal(f.merges.length, hasMergeToken ? 1 : 0);
-      assert.equal(f.warnings.length, hasMergeToken ? 0 : 1);
-    }
+    const f = fixture();
+    f.files[0][renamed ? 'previous_filename' : 'filename'] = '.github/workflows/test.yml';
+    await merge(f.options);
+    assert.equal(f.merges.length, 0);
+    assert.equal(f.dispatches.length, 0);
+    assert.equal(f.warnings.length, 1);
   }
+});
+
+test('does not dispatch Release when merging is refused or throws', async () => {
+  for (const throws of [true, false]) {
+    const f = fixture();
+    const failures = [];
+    f.options.core.setFailed = (message) => failures.push(message);
+    f.options.github.rest.pulls.merge = async () => {
+      if (throws) throw new Error('Head changed');
+      return { data: { merged: false, message: 'Merge refused' } };
+    };
+    if (throws) await assert.rejects(merge(f.options), /Head changed/);
+    else {
+      await merge(f.options);
+      assert.deepEqual(failures, ['#83: Merge refused']);
+    }
+    assert.equal(f.dispatches.length, 0);
+  }
+});
+
+test('reports manual recovery when Release dispatch fails after a merge', async () => {
+  const f = fixture();
+  const failures = [];
+  f.options.core.setFailed = (message) => failures.push(message);
+  f.options.github.rest.actions.createWorkflowDispatch = async () => {
+    throw new Error('API unavailable');
+  };
+  await merge(f.options);
+  assert.equal(f.merges.length, 1);
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /Run the Release workflow manually on main/);
 });

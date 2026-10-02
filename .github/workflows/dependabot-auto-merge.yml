@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: read
+  actions: write
   contents: write
   pull-requests: write
 
@@ -33,10 +33,8 @@ jobs:
         run: node --test .github/scripts/dependabot-auto-merge.test.cjs
       - name: Merge eligible Dependabot PRs
         uses: actions/github-script@v9
-        env:
-          HAS_MERGE_TOKEN: ${{ secrets.DEPENDABOT_MERGE_TOKEN != '' }}
         with:
-          github-token: ${{ secrets.DEPENDABOT_MERGE_TOKEN || secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const merge = require('./.github/scripts/dependabot-auto-merge.cjs');
-            await merge({ github, context, core, hasMergeToken: process.env.HAS_MERGE_TOKEN === 'true' });
+            await merge({ github, context, core });

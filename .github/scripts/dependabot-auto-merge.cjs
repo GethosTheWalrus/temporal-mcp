@@ -8,7 +8,7 @@ const requiredWorkflows = [
   '.github/workflows/docker-scout.yml',
 ];
 
-module.exports = async ({ github, context, core, hasMergeToken }) => {
+module.exports = async ({ github, context, core }) => {
   const { owner, repo } = context.repo;
   const pulls = await github.paginate(github.rest.pulls.list, {
     owner, repo, state: 'open', base: 'main', per_page: 100,
@@ -40,9 +40,9 @@ module.exports = async ({ github, context, core, hasMergeToken }) => {
     const files = await github.paginate(github.rest.pulls.listFiles, {
       owner, repo, pull_number: pull.number, per_page: 100,
     });
-    if (!hasMergeToken && files.some((file) =>
+    if (files.some((file) =>
       [file.filename, file.previous_filename].some((name) => name?.startsWith('.github/workflows/')))) {
-      core.warning(`#${pull.number}: add the DEPENDABOT_MERGE_TOKEN Actions secret with Workflows write permission to merge workflow updates.`);
+      core.warning(`#${pull.number}: workflow-file updates require manual review and merging; GITHUB_TOKEN cannot merge them.`);
       continue;
     }
 
@@ -55,5 +55,14 @@ module.exports = async ({ github, context, core, hasMergeToken }) => {
       continue;
     }
     core.info(`Merged #${pull.number}: ${result.sha}`);
+    // GITHUB_TOKEN pushes do not trigger push workflows, but explicit dispatches do.
+    try {
+      await github.rest.actions.createWorkflowDispatch({
+        owner, repo, workflow_id: 'release.yml', ref: 'main',
+      });
+      core.info(`Dispatched Release on main after merging #${pull.number}.`);
+    } catch (error) {
+      core.setFailed(`Merged #${pull.number}, but Release dispatch failed: ${error.message}. Run the Release workflow manually on main.`);
+    }
   }
 };
