@@ -4,7 +4,7 @@ temporalio>=1.5.0
 # Model Context Protocol
 # Keep the tested 2.0/2.1 SDK API: 2.2 changes protocol model wrappers.
 # Remove the cap after validating stdio/tool dispatch against the new types.
-mcp>=2.0.0,<2.2.0
+mcp>=2.0.0,<2.3.0
 
 # Security floors for transitive runtime dependencies
 idna>=3.15
