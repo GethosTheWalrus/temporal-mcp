@@ -89,7 +89,7 @@ class TemporalMCPServer:
             client = await self.client_manager.get_client(namespace)
         except Exception as e:
             print(f"Connection failed for tool {name} namespace={namespace}: {e}", file=sys.stderr)
-            return format_connection_error(e)
+            return CallToolResult(content=list(format_connection_error(e)), is_error=True)
 
         print(f"Executing tool {name} namespace={namespace}", file=sys.stderr)
         try:
@@ -166,11 +166,11 @@ class TemporalMCPServer:
                 return await schedule_handlers.describe_schedule(client, handler_arguments)
 
             else:
-                return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}", "type": "unknown_tool"}, indent=2))]
+                return CallToolResult(content=[TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}", "type": "unknown_tool"}, indent=2))], is_error=True)
 
         except Exception as e:
             print(f"Tool failed: {name} namespace={namespace}", file=sys.stderr)
-            return format_error_response(e, name)
+            return CallToolResult(content=list(format_error_response(e, name)), is_error=True)
 
     async def run(self):
         """Run the MCP server."""
