@@ -2,6 +2,32 @@
 
 <!-- version list -->
 
+## v1.10.2 (2026-10-11)
+
+### Bug Fixes
+
+- Mark failed tool calls as MCP errors
+  ([#87](https://github.com/GethosTheWalrus/temporal-mcp/pull/87),
+  [`7ba275e`](https://github.com/GethosTheWalrus/temporal-mcp/commit/7ba275e53c911e26574908f8de4227742879ead6))
+
+### Chores
+
+- **deps**: Bump google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml
+  ([#81](https://github.com/GethosTheWalrus/temporal-mcp/pull/81),
+  [`edc721c`](https://github.com/GethosTheWalrus/temporal-mcp/commit/edc721c339b25e609bc14e91b7ba265e49b5bf98))
+
+- **deps**: Update mcp requirement ([#86](https://github.com/GethosTheWalrus/temporal-mcp/pull/86),
+  [`8b8c58c`](https://github.com/GethosTheWalrus/temporal-mcp/commit/8b8c58c797826fa7352aeb09f2520e46b509b201))
+
+- **deps-dev**: Update filelock requirement from >=4.0.3 to >=4.0.8
+  ([#85](https://github.com/GethosTheWalrus/temporal-mcp/pull/85),
+  [`5a0b9ae`](https://github.com/GethosTheWalrus/temporal-mcp/commit/5a0b9ae7a2501a6f5e35cd27845b7a19d5fc9872))
+
+- **deps-dev**: Update flake8 requirement from >=7.3.0 to >=7.4.1
+  ([#83](https://github.com/GethosTheWalrus/temporal-mcp/pull/83),
+  [`e734c11`](https://github.com/GethosTheWalrus/temporal-mcp/commit/e734c1161fb1e3a1d032dd44624282c774345b08))
+
+
 ## v1.10.1 (2026-10-02)
 
 ### Bug Fixes
