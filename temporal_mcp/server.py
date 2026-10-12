@@ -69,6 +69,17 @@ class TemporalMCPServer:
         result = await self._execute_tool(params.name, params.arguments or {})
         if isinstance(result, CallToolResult):
             return result
+        # These handlers return error payloads without raising. Preserve their
+        # JSON for callers while marking the MCP tool result as failed.
+        soft_errors = {
+            "get_workflow_result": "timeout",
+            "get_activity_result": "timeout",
+            "get_workflow_event": "not_found",
+        }
+        if params.name in soft_errors and result and isinstance(result[0], TextContent):
+            payload = json.loads(result[0].text)
+            if payload.get("type") == soft_errors[params.name] and "error" in payload:
+                return CallToolResult(content=list(result), is_error=True)
         return CallToolResult(content=list(result))
 
     async def _execute_tool(self, name: str, arguments: Any) -> Sequence[ContentBlock] | CallToolResult:
