@@ -12,5 +12,5 @@ mypy>=2.4.0
 pre-commit>=4.6.2
 
 # Security floors for transitive development dependencies
-filelock>=4.0.12
+filelock>=4.1.0
 pygments>=2.21.0
