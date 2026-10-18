@@ -6,7 +6,7 @@ pytest>=9.1.1
 pytest-asyncio>=1.4.0
 
 # Code quality
-black>=26.10.0
+black>=26.10.1
 flake8>=7.4.1
 mypy>=2.4.0
 pre-commit>=4.6.2
