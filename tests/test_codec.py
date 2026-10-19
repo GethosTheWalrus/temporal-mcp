@@ -2,6 +2,7 @@
 
 import json
 import threading
+import time
 import urllib.error
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -23,15 +24,28 @@ def _serve(handler_class):
 @pytest.fixture
 def codec_server():
     """A codec server that reverses payload data, with switches for misbehaviour."""
-    state = {"requests": [], "redirect_to": None, "drop_payloads": False}
+    state = {"requests": [], "redirect": False, "status": 200, "delay": 0.0, "drop_payloads": False}
 
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             state["requests"].append({"path": self.path, "headers": dict(self.headers), "body": body})
-            if state["redirect_to"]:
+            if state["delay"]:
+                time.sleep(state["delay"])
+            try:
+                self._send_response(state, body)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+        def _send_response(self, state, body):
+            if state["redirect"]:
                 self.send_response(302)
-                self.send_header("Location", state["redirect_to"])
+                self.send_header("Location", "/redirected")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            if state["status"] != 200:
+                self.send_response(state["status"])
                 self.send_header("Content-Length", "0")
                 self.end_headers()
                 return
@@ -82,32 +96,33 @@ class TestRemoteCodec:
         assert state["requests"] == []
 
     @pytest.mark.asyncio
-    async def test_redirect_is_not_followed_and_credentials_are_not_forwarded(self, codec_server):
+    async def test_redirect_is_not_followed(self, codec_server):
         endpoint, state = codec_server
-        forwarded = []
-
-        class Target(BaseHTTPRequestHandler):
-            def do_GET(self):
-                forwarded.append(dict(self.headers))
-                self.send_response(200)
-                self.send_header("Content-Length", "2")
-                self.end_headers()
-                self.wfile.write(b"{}")
-
-            do_POST = do_GET
-
-            def log_message(self, *args):
-                pass
-
-        target = _serve(Target)
-        state["redirect_to"] = f"http://127.0.0.1:{target.server_port}/steal"
+        state["redirect"] = True
 
         with pytest.raises(urllib.error.HTTPError) as exc_info:
             await RemoteCodec(endpoint, namespace="ns", auth="Bearer SECRET").decode([Payload(data=b"x")])
-        target.shutdown()
 
         assert exc_info.value.code == 302
-        assert forwarded == []
+        assert [request["path"] for request in state["requests"]] == ["/decode"]
+
+    @pytest.mark.asyncio
+    async def test_error_response_is_raised(self, codec_server):
+        endpoint, state = codec_server
+        state["status"] = 503
+
+        with pytest.raises(urllib.error.HTTPError) as exc_info:
+            await RemoteCodec(endpoint, namespace="ns").decode([Payload(data=b"x")])
+
+        assert exc_info.value.code == 503
+
+    @pytest.mark.asyncio
+    async def test_request_timeout_is_raised(self, codec_server):
+        endpoint, state = codec_server
+        state["delay"] = 0.5
+
+        with pytest.raises(TimeoutError):
+            await RemoteCodec(endpoint, namespace="ns", timeout=0.05).decode([Payload(data=b"x")])
 
     @pytest.mark.asyncio
     async def test_response_with_wrong_payload_count_is_rejected(self, codec_server):
@@ -123,6 +138,15 @@ class TestCodecSettings:
     def test_non_http_endpoint_is_rejected(self, endpoint):
         with pytest.raises(ValueError, match="http"):
             CodecSettings(endpoint=endpoint)
+
+    @pytest.mark.parametrize("endpoint", ["http://", "https:///decode"])
+    def test_endpoint_without_a_host_is_rejected(self, endpoint):
+        with pytest.raises(ValueError, match="host"):
+            CodecSettings(endpoint=endpoint)
+
+    @pytest.mark.parametrize("endpoint", ["https://codec.example/", "https://codec.example///"])
+    def test_endpoint_trailing_slashes_are_removed(self, endpoint):
+        assert CodecSettings(endpoint=endpoint).endpoint == "https://codec.example"
 
     def test_for_namespace_builds_a_codec_with_that_namespace(self):
         codec = CodecSettings(endpoint="https://codec.example/", auth="Bearer t").for_namespace("payments")

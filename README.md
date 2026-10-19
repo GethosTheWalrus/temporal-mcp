@@ -133,7 +133,9 @@ Every tool accepts an optional `namespace` argument. If omitted, the server uses
 
 ### Remote codec
 
-When payloads or failure messages are encrypted by a [codec server](https://docs.temporal.io/production-deployment/data-encryption), set `--codec-endpoint` and the server decodes them through it: `get_workflow_event` shows decoded inputs, results and failure details, and `get_workflow_history` shows decoded failure messages and stack traces, including every cause in the chain. Without a codec nothing is decoded and no requests are made to a codec server.
+When payloads or failure messages are encrypted by a [codec server](https://docs.temporal.io/production-deployment/data-encryption), set `--codec-endpoint` and the server decodes them through it: `get_workflow_event` shows decoded inputs, results and failure details, and `get_workflow_history` shows decoded failure messages and stack traces, including every cause in the chain. The codec is also used for outbound data: workflow inputs and other values the server sends to Temporal are encoded through the codec server's `/encode` endpoint. The codec server must therefore expose both `/encode` and `/decode`. Without a codec nothing is decoded and no requests are made to a codec server.
+
+`get_workflow_history` decodes failure messages and stack traces only. Workflow inputs, results and failure details in the history remain encoded; use `get_workflow_event` to see decoded inputs and results for a single event.
 
 Each request carries the namespace in an `X-Namespace` header, and requests for other allowed namespaces use their own. Only `http` and `https` endpoints are accepted, and redirects are never followed, so credentials are not forwarded to another host.
 
