@@ -14,7 +14,9 @@ import argparse
 import asyncio
 import os
 import sys
+from typing import Optional
 
+from temporal_mcp.codec import CodecSettings
 from temporal_mcp.server import TemporalMCPServer
 
 
@@ -63,7 +65,34 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="API key for Temporal Cloud authentication (env: TEMPORAL_API_KEY)",
     )
+    parser.add_argument(
+        "--codec-endpoint",
+        metavar="URL",
+        default=None,
+        help="Base URL of a codec server used to decode payloads and failure messages (env: TEMPORAL_CODEC_ENDPOINT)",
+    )
+    parser.add_argument(
+        "--codec-auth",
+        metavar="HEADER",
+        default=None,
+        help='Authorization header value sent to the codec server, e.g. "Bearer <token>" (env: TEMPORAL_CODEC_AUTH)',
+    )
     return parser.parse_args()
+
+
+def _build_codec(args: argparse.Namespace) -> Optional[CodecSettings]:
+    """Build the codec settings from CLI arguments and environment variables, exiting with a message on invalid combinations."""
+    endpoint = args.codec_endpoint or os.environ.get("TEMPORAL_CODEC_ENDPOINT")
+    auth = args.codec_auth or os.environ.get("TEMPORAL_CODEC_AUTH")
+    if not endpoint:
+        if auth:
+            sys.exit("--codec-auth requires --codec-endpoint (TEMPORAL_CODEC_ENDPOINT)")
+        return None
+
+    try:
+        return CodecSettings(endpoint=endpoint, auth=auth)
+    except ValueError as e:
+        sys.exit(str(e))
 
 
 def main():
@@ -92,6 +121,8 @@ def main():
     allowed_namespaces_raw = os.environ.get("TEMPORAL_ALLOWED_NAMESPACES")
     allowed_namespaces = allowed_namespaces_raw.split(",") if allowed_namespaces_raw is not None else None
 
+    codec = _build_codec(args)
+
     print(
         f"Starting MCP server with TEMPORAL_HOST={temporal_host}, TLS={tls_enabled}",
         file=sys.stderr,
@@ -111,6 +142,7 @@ def main():
         tls_client_key_path=tls_client_key_path,
         api_key=api_key,
         allowed_namespaces=allowed_namespaces,
+        codec=codec,
     )
     asyncio.run(server.run())
 

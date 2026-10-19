@@ -254,3 +254,33 @@ class TestArgPrecedenceOverEnv:
         assert kwargs["tls_client_cert_path"] == "/arg/cert.pem"
         assert kwargs["tls_client_key_path"] == "/arg/key.pem"
         assert kwargs["api_key"] == "arg-secret"
+
+
+# ---------------------------------------------------------------------------
+# codec configuration
+# ---------------------------------------------------------------------------
+
+
+class TestCodecConfig:
+    ENDPOINT = {"TEMPORAL_CODEC_ENDPOINT": "https://codec.example"}
+
+    def test_no_codec_by_default(self):
+        assert _run_main([])["codec"] is None
+
+    def test_endpoint_and_auth_from_env(self):
+        codec = _run_main([], {**self.ENDPOINT, "TEMPORAL_CODEC_AUTH": "Bearer static"})["codec"]
+
+        assert (codec.endpoint, codec.auth) == ("https://codec.example", "Bearer static")
+
+    def test_flags_take_precedence_over_env(self):
+        codec = _run_main(["--codec-endpoint", "https://flag.example", "--codec-auth", "Bearer flag"], {**self.ENDPOINT, "TEMPORAL_CODEC_AUTH": "Bearer env"})["codec"]
+
+        assert (codec.endpoint, codec.auth) == ("https://flag.example", "Bearer flag")
+
+    def test_auth_requires_an_endpoint(self):
+        with pytest.raises(SystemExit, match="--codec-endpoint"):
+            _run_main([], {"TEMPORAL_CODEC_AUTH": "Bearer t"})
+
+    def test_non_http_endpoint_exits(self):
+        with pytest.raises(SystemExit, match="http"):
+            _run_main([], {"TEMPORAL_CODEC_ENDPOINT": "file:///etc/passwd"})

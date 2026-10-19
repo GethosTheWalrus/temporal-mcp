@@ -124,10 +124,20 @@ Recommended when running from PyPI via [`uvx`](https://docs.astral.sh/uv/guides/
 | mTLS cert path | `--tls-cert` | `TEMPORAL_TLS_CLIENT_CERT_PATH` | — |
 | mTLS key path | `--tls-key` | `TEMPORAL_TLS_CLIENT_KEY_PATH` | — |
 | API key | `--api-key` | `TEMPORAL_API_KEY` | — |
+| Codec server URL | `--codec-endpoint` | `TEMPORAL_CODEC_ENDPOINT` | — |
+| Codec `Authorization` header | `--codec-auth` | `TEMPORAL_CODEC_AUTH` | — |
 
 CLI arguments take precedence over environment variables. When `TEMPORAL_API_KEY` is set, TLS is enabled automatically. When mTLS cert/key paths are provided, TLS is also enabled automatically.
 
 Every tool accepts an optional `namespace` argument. If omitted, the server uses `--namespace`, then `TEMPORAL_NAMESPACE`, then `default`. Runtime overrides are disabled by default: set `TEMPORAL_ALLOWED_NAMESPACES` to a comma-separated allowlist such as `default,payments`, or set it to `*` to permit any namespace reachable through the configured Temporal host and credentials. A finite allowlist must include the configured default namespace.
+
+### Remote codec
+
+When payloads or failure messages are encrypted by a [codec server](https://docs.temporal.io/production-deployment/data-encryption), set `--codec-endpoint` and the server decodes them through it: `get_workflow_event` shows decoded inputs, results and failure details, and `get_workflow_history` shows decoded failure messages and stack traces, including every cause in the chain. Without a codec nothing is decoded and no requests are made to a codec server.
+
+Each request carries the namespace in an `X-Namespace` header, and requests for other allowed namespaces use their own. Only `http` and `https` endpoints are accepted, and redirects are never followed, so credentials are not forwarded to another host.
+
+If the codec server requires authentication, pass the full header value with `--codec-auth "Bearer <token>"` (or `TEMPORAL_CODEC_AUTH`). You are responsible for renewing it.
 
 ## Development
 

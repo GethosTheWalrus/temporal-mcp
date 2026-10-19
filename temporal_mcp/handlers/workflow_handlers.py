@@ -3,13 +3,21 @@
 import asyncio
 import json
 import sys
-from typing import Any
+from typing import Any, Optional
 
 from mcp.types import TextContent
 from temporalio.client import Client
 from temporalio.api.common.v1 import Payloads
 from temporalio.api.enums.v1 import EventType, RetryState, StartChildWorkflowExecutionFailedCause, TimeoutType, WorkflowExecutionStatus
 from temporalio.api.failure.v1 import Failure
+
+_FAILURE_EVENT_ATTRIBUTES = frozenset(
+    {
+        "activity_task_failed_event_attributes",
+        "workflow_execution_failed_event_attributes",
+        "child_workflow_execution_failed_event_attributes",
+    }
+)
 
 
 async def start_workflow(client: Client, args: dict) -> list[TextContent]:
@@ -245,7 +253,11 @@ async def get_workflow_history(client: Client, args: dict) -> list[TextContent]:
                 "workflow_type": initiated_attrs.workflow_type.name,
             }
 
-        events.append(_workflow_history_event_to_dict(event, scheduled_activities, initiated_child_workflows))
+        decode_result = await _decode_encoded_failures(client, event)
+        event_info = _workflow_history_event_to_dict(event, scheduled_activities, initiated_child_workflows)
+        if decode_result:
+            event_info["attributes"]["failure"].update(decode_result)
+        events.append(event_info)
         count += 1
         if count >= limit:
             break
@@ -277,6 +289,13 @@ def _workflow_history_event_to_dict(event: Any, scheduled_activities: dict[int, 
             "scheduled_event_id": attrs.scheduled_event_id,
             "started_event_id": attrs.started_event_id,
             "activity": scheduled_activities.get(attrs.scheduled_event_id),
+            "retry_state": attrs.retry_state,
+            "retry_state_name": _enum_name(RetryState, attrs.retry_state),
+            "failure": _failure_to_metadata(attrs.failure),
+        }
+    elif attributes_type == "workflow_execution_failed_event_attributes":
+        attrs = event.workflow_execution_failed_event_attributes
+        event_info["attributes"] = {
             "retry_state": attrs.retry_state,
             "retry_state_name": _enum_name(RetryState, attrs.retry_state),
             "failure": _failure_to_metadata(attrs.failure),
@@ -331,6 +350,45 @@ def _workflow_history_event_to_dict(event: Any, scheduled_activities: dict[int, 
         }
 
     return event_info
+
+
+async def _decode_encoded_failures(client: Client, event: Any) -> Optional[dict[str, Any]]:
+    """Decode, in place, the message and stack trace of every failure in the event's cause chain.
+
+    Failures from workers with a codec carry their message and stack trace as encoded attributes,
+    leaving only a placeholder in `message`. Does nothing when the client has no codec.
+
+    Returns:
+        None when there was nothing to decode, otherwise fields to merge into the failure metadata.
+    """
+    attributes_type = event.WhichOneof("attributes")
+    codec = client.data_converter.payload_codec
+    if attributes_type not in _FAILURE_EVENT_ATTRIBUTES or codec is None:
+        return None
+
+    encoded_levels = []
+    level = getattr(event, attributes_type).failure
+    while True:
+        if level.HasField("encoded_attributes"):
+            encoded_levels.append(level)
+        if not level.HasField("cause"):
+            break
+        level = level.cause
+    if not encoded_levels:
+        return None
+
+    try:
+        decoded_payloads = await codec.decode([level.encoded_attributes for level in encoded_levels])
+        decoded_attributes = client.data_converter.payload_converter.from_payloads(decoded_payloads)
+        for level, attributes in zip(encoded_levels, decoded_attributes, strict=True):
+            if isinstance(attributes, dict):
+                for field in ("message", "stack_trace"):
+                    if isinstance(attributes.get(field), str):
+                        setattr(level, field, attributes[field])
+            level.ClearField("encoded_attributes")
+    except Exception as e:
+        return {"decoded": False, "error": str(e), "error_type": type(e).__name__}
+    return {"decoded": True}
 
 
 def _child_workflow_metadata(attrs: Any) -> dict[str, Any]:

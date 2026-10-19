@@ -8,8 +8,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from mcp.types import CallToolRequestParams
 from temporalio.client import Client
+from temporalio.converter import DataConverter
 from temporalio.service import ServiceClient
 
+from temporal_mcp.client import TemporalClientManager
+from temporal_mcp.codec import CodecSettings
 from temporal_mcp.server import TemporalMCPServer
 from temporal_mcp.tools.tool_definitions import get_all_tools
 
@@ -146,3 +149,32 @@ def test_wildcard_schema_does_not_restrict_namespace_values():
     tools = get_all_tools(server.client_manager.allowed_namespaces)
 
     assert all("enum" not in (getattr(tool, "input_schema", None) or tool.inputSchema)["properties"]["namespace"] for tool in tools)
+
+
+def _manager_with_connected_client(**kwargs):
+    manager = TemporalClientManager(namespace="production", allowed_namespaces=["production", "payments"], **kwargs)
+    service_client = MagicMock(spec=ServiceClient)
+    service_client.config = MagicMock(identity="codec-routing-test")
+    manager.client = Client(service_client, namespace="production", data_converter=manager._build_data_converter("production"))
+    return manager
+
+
+@pytest.mark.asyncio
+async def test_each_namespace_client_sends_its_own_namespace_to_the_codec():
+    manager = _manager_with_connected_client(codec=CodecSettings(endpoint="https://codec.example", auth="Bearer t"))
+
+    payments = await manager.get_client("payments")
+    production = await manager.get_client("production")
+
+    assert payments.data_converter.payload_codec.namespace == "payments"
+    assert payments.data_converter.payload_codec.endpoint == "https://codec.example"
+    assert payments.data_converter.payload_codec.auth == "Bearer t"
+    assert production.data_converter.payload_codec.namespace == "production"
+    assert manager.client.data_converter.payload_codec.namespace == "production"
+
+
+@pytest.mark.asyncio
+async def test_other_namespace_client_keeps_the_default_converter_without_a_codec():
+    payments = await _manager_with_connected_client().get_client("payments")
+
+    assert payments.data_converter is DataConverter.default
