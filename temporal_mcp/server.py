@@ -10,7 +10,7 @@ from mcp.types import CallToolRequestParams, CallToolResult, ContentBlock, ListT
 
 from .client import TemporalClientManager
 from .codec import CodecSettings
-from .tools.tool_definitions import get_all_tools
+from .tools.tool_definitions import get_all_tools, get_codec_auth_tools
 from .utils.exceptions import format_connection_error, format_error_response
 
 # Import all handlers
@@ -46,7 +46,7 @@ class TemporalMCPServer:
             api_key: API key for Temporal Cloud authentication
             allowed_namespaces: Namespaces callers may select. None permits only the
                 configured default; ["*"] permits any namespace.
-            codec: Remote codec server for payload/failure decoding
+            codec: Remote codec server for payload/failure decoding. Its token provider, if any, enables the codec login tools.
         """
         self.client_manager = TemporalClientManager(
             temporal_host=temporal_host,
@@ -58,6 +58,7 @@ class TemporalMCPServer:
             allowed_namespaces=allowed_namespaces,
             codec=codec,
         )
+        self.codec_token_provider = codec.token_provider if codec else None
         self.server = Server(
             "temporal-mcp-server",
             on_list_tools=self._list_tools,
@@ -66,7 +67,10 @@ class TemporalMCPServer:
 
     async def _list_tools(self, context: Any, params: Any) -> ListToolsResult:
         """List available Temporal tools."""
-        return ListToolsResult(tools=get_all_tools(self.client_manager.allowed_namespaces))
+        tools = get_all_tools(self.client_manager.allowed_namespaces)
+        if self.codec_token_provider:
+            tools.extend(get_codec_auth_tools())
+        return ListToolsResult(tools=tools)
 
     async def _call_tool(self, context: Any, params: CallToolRequestParams) -> CallToolResult:
         """Handle tool execution requests."""
@@ -77,6 +81,15 @@ class TemporalMCPServer:
 
     async def _execute_tool(self, name: str, arguments: Any) -> Sequence[ContentBlock] | CallToolResult:
         """Execute a Temporal tool by name."""
+        provider = self.codec_token_provider
+        if provider and name in ("codec_auth_status", "codec_login"):
+            try:
+                state = provider.status() if name == "codec_auth_status" else await provider.start_login()
+            except Exception as e:
+                print(f"Codec auth tool {name} failed: {e}", file=sys.stderr)
+                return CallToolResult(content=list(format_error_response(e, name)), is_error=True)
+            return [TextContent(type="text", text=json.dumps(state, indent=2))]
+
         handler_arguments = dict(arguments)
         requested_namespace = handler_arguments.pop("namespace", None)
 

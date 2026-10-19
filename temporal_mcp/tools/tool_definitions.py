@@ -5,6 +5,29 @@ from typing import Iterable, Optional
 from mcp.types import Tool
 
 
+def get_codec_auth_tools() -> list[Tool]:
+    """Tools for authenticating against the remote codec server.
+
+    Returns:
+        List of Tool definitions
+    """
+    return [
+        Tool(
+            name="codec_auth_status",
+            description="Show whether the codec server login is valid. Needed to decode payloads and failure messages.",
+            input_schema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="codec_login",
+            description=(
+                "Log in to the codec server when payloads or failures cannot be decoded. Refreshes silently when possible; "
+                "otherwise returns a URL and code the user must open in a browser. Login completes in the background."
+            ),
+            input_schema={"type": "object", "properties": {}},
+        ),
+    ]
+
+
 def get_all_tools(allowed_namespaces: Optional[Iterable[str]] = None) -> list[Tool]:
     """Get all available Temporal tools.
 

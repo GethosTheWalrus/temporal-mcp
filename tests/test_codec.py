@@ -11,6 +11,7 @@ from google.protobuf.json_format import MessageToDict, ParseDict
 from temporalio.api.common.v1 import Payload, Payloads
 from temporalio.converter import DataConverter, DefaultFailureConverterWithEncodedAttributes
 
+from temporal_mcp.auth import CodecTokenProvider
 from temporal_mcp.client import TemporalClientManager
 from temporal_mcp.codec import CodecSettings, RemoteCodec
 
@@ -67,6 +68,10 @@ def codec_server():
     server.shutdown()
 
 
+def _provider(cache_path):
+    return CodecTokenProvider(str(cache_path), login_url="https://login.example", client_id="client", audience="https://audience")
+
+
 class TestRemoteCodec:
     @pytest.mark.asyncio
     async def test_decode_posts_to_decode_with_namespace_and_auth(self, codec_server):
@@ -96,6 +101,17 @@ class TestRemoteCodec:
 
         assert await RemoteCodec(endpoint, namespace="ns").decode([]) == []
         assert state["requests"] == []
+
+    @pytest.mark.asyncio
+    async def test_token_provider_overrides_static_auth(self, codec_server, tmp_path):
+        endpoint, state = codec_server
+        cache = tmp_path / "token.json"
+        cache.write_text(json.dumps({"access_token": "from-cache", "refresh_token": "", "expires_at": "2999-01-01T00:00:00+00:00"}))
+        codec = RemoteCodec(endpoint, namespace="ns", auth="Bearer static", token_provider=_provider(cache))
+
+        await codec.decode([Payload(data=b"x")])
+
+        assert state["requests"][0]["headers"]["Authorization"] == "Bearer from-cache"
 
     @pytest.mark.asyncio
     async def test_redirect_is_not_followed(self, codec_server):
@@ -150,10 +166,13 @@ class TestCodecSettings:
     def test_endpoint_trailing_slashes_are_removed(self, endpoint):
         assert CodecSettings(endpoint=endpoint).endpoint == "https://codec.example"
 
-    def test_for_namespace_builds_a_codec_with_that_namespace(self):
-        codec = CodecSettings(endpoint="https://codec.example/", auth="Bearer t").for_namespace("payments")
+    def test_for_namespace_builds_a_codec_with_that_namespace(self, tmp_path):
+        provider = _provider(tmp_path / "token.json")
+        settings = CodecSettings(endpoint="https://codec.example/", auth="Bearer t", token_provider=provider)
 
-        assert (codec.endpoint, codec.namespace, codec.auth) == ("https://codec.example", "payments", "Bearer t")
+        codec = settings.for_namespace("payments")
+
+        assert (codec.endpoint, codec.namespace, codec.auth, codec.token_provider) == ("https://codec.example", "payments", "Bearer t", provider)
 
 
 class TestBuildDataConverter:
