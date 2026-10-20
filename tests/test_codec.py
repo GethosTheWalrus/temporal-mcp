@@ -35,6 +35,8 @@ def codec_server():
             try:
                 self._send_response(state, body)
             except (BrokenPipeError, ConnectionResetError):
+                # The client may close the connection before reading the response.
+                # In tests this is expected occasionally, so we ignore these socket errors.
                 pass
 
         def _send_response(self, state, body):
