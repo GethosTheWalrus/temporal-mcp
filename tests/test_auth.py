@@ -133,8 +133,8 @@ class TestGetToken:
         url, state = oauth_server
         cache = tmp_path / "token.json"
         _write_cache(cache, expires_in=-10)
-        # Deliberately world-readable so the test can prove the provider tightens it to 0600.
-        cache.chmod(0o644)
+        # Deliberately more permissive than 0600 so the test can prove the provider tightens it.
+        cache.chmod(0o640)
 
         _provider(cache, url).get_token()
 
