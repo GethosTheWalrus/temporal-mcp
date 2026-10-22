@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.11.1 (2026-10-22)
+
+### Bug Fixes
+
+- Validate codec endpoints and document codec scope
+  ([#101](https://github.com/GethosTheWalrus/temporal-mcp/pull/101),
+  [`a25593a`](https://github.com/GethosTheWalrus/temporal-mcp/commit/a25593aee7fd67e0fea9ab3301b8140d763b3dee))
+
+
 ## v1.11.0 (2026-10-22)
 
 ### Chores
