@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from datetime import datetime, timezone
 from google.protobuf.timestamp_pb2 import Timestamp
-from temporalio.api.common.v1 import ActivityType, Payloads, WorkflowExecution, WorkflowType
+from temporalio.api.common.v1 import ActivityType, Payload, Payloads, WorkflowExecution, WorkflowType
 from temporalio.api.enums.v1 import EventType, RetryState
 from temporalio.api.failure.v1 import ApplicationFailureInfo, Failure
 from temporalio.api.history.v1 import (
@@ -15,9 +15,11 @@ from temporalio.api.history.v1 import (
     ChildWorkflowExecutionFailedEventAttributes,
     HistoryEvent,
     StartChildWorkflowExecutionInitiatedEventAttributes,
+    WorkflowExecutionFailedEventAttributes,
     WorkflowExecutionStartedEventAttributes,
 )
-from temporalio.converter import default
+from temporalio.converter import DataConverter, DefaultFailureConverterWithEncodedAttributes, PayloadCodec, default
+from temporalio.exceptions import ActivityError, ApplicationError
 
 from temporal_mcp.handlers import workflow_handlers
 
@@ -428,3 +430,123 @@ def _history_event(event_id, event_type, **attributes):
 class _FailingDataConverter:
     async def decode(self, payloads):
         raise ValueError("bad payload")
+
+
+class _ReverseCodec(PayloadCodec):
+    def __init__(self):
+        self.decode_calls = 0
+
+    async def encode(self, payloads):
+        return [Payload(metadata=p.metadata, data=p.data[::-1]) for p in payloads]
+
+    async def decode(self, payloads):
+        self.decode_calls += 1
+        return [Payload(metadata=p.metadata, data=p.data[::-1]) for p in payloads]
+
+
+class _BrokenCodec(PayloadCodec):
+    async def encode(self, payloads):
+        return list(payloads)
+
+    async def decode(self, payloads):
+        raise ConnectionError("codec unreachable")
+
+
+_FAILURE_EVENTS = [
+    pytest.param(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_FAILED, "workflow_execution_failed_event_attributes", WorkflowExecutionFailedEventAttributes, id="workflow"),
+    pytest.param(EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED, "activity_task_failed_event_attributes", ActivityTaskFailedEventAttributes, id="activity"),
+    pytest.param(EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_FAILED, "child_workflow_execution_failed_event_attributes", ChildWorkflowExecutionFailedEventAttributes, id="child-workflow"),
+]
+
+
+def _encoding_converter(codec):
+    return DataConverter(payload_codec=codec, failure_converter_class=DefaultFailureConverterWithEncodedAttributes)
+
+
+async def _encoded_failure(converter, error):
+    failure = Failure()
+    await converter.encode_failure(error, failure)
+    return failure
+
+
+def _activity_error_with_cause():
+    try:
+        raise ApplicationError("the real reason")
+    except ApplicationError as cause:
+        error = ActivityError(
+            "Activity task failed",
+            scheduled_event_id=1,
+            started_event_id=2,
+            identity="worker",
+            activity_type="export",
+            activity_id="1",
+            retry_state=RetryState.RETRY_STATE_MAXIMUM_ATTEMPTS_REACHED,
+        )
+        error.__cause__ = cause
+    return error
+
+
+async def _history_failure(data_converter, event_type, attribute_name, attribute_class, failure):
+    event = _history_event(event_id=9, event_type=event_type, **{attribute_name: attribute_class(failure=failure)})
+
+    async def fetch_history_events():
+        yield event
+
+    handle = MagicMock()
+    handle.fetch_history_events = fetch_history_events
+    client = AsyncMock()
+    client.data_converter = data_converter
+    client.get_workflow_handle = MagicMock(return_value=handle)
+
+    result = await workflow_handlers.get_workflow_history(client, {"workflow_id": "wf"})
+
+    return json.loads(result[0].text)["events"][0]["attributes"]["failure"]
+
+
+class TestHistoryFailureDecoding:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("event_type, attribute_name, attribute_class", _FAILURE_EVENTS)
+    async def test_message_and_stack_trace_are_decoded_for_the_whole_cause_chain(self, event_type, attribute_name, attribute_class):
+        codec = _ReverseCodec()
+        converter = _encoding_converter(codec)
+        failure = await _encoded_failure(converter, _activity_error_with_cause())
+        assert (failure.message, failure.cause.message) == ("Encoded failure", "Encoded failure")
+
+        info = await _history_failure(converter, event_type, attribute_name, attribute_class, failure)
+
+        assert info["message"] == "Activity task failed"
+        assert info["decoded"] is True
+        assert info["cause"]["message"] == "the real reason"
+        assert "raise ApplicationError" in info["cause"]["stack_trace"]
+        assert codec.decode_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_encoded_failure_is_left_as_is_without_a_codec(self):
+        failure = await _encoded_failure(_encoding_converter(_ReverseCodec()), ApplicationError("secret"))
+
+        info = await _history_failure(DataConverter.default, *_FAILURE_EVENTS[0].values, failure)
+
+        assert info["message"] == "Encoded failure"
+        assert "decoded" not in info
+
+    @pytest.mark.asyncio
+    async def test_plain_failure_does_not_call_the_codec(self):
+        codec = _ReverseCodec()
+        failure = Failure(message="plain failure", application_failure_info=ApplicationFailureInfo(type="ValueError"))
+
+        info = await _history_failure(_encoding_converter(codec), *_FAILURE_EVENTS[0].values, failure)
+
+        assert info["message"] == "plain failure"
+        assert "decoded" not in info
+        assert codec.decode_calls == 0
+
+    @pytest.mark.asyncio
+    async def test_codec_error_is_reported_and_the_message_stays_encoded(self):
+        failure = await _encoded_failure(_encoding_converter(_ReverseCodec()), ApplicationError("secret"))
+
+        info = await _history_failure(_encoding_converter(_BrokenCodec()), *_FAILURE_EVENTS[0].values, failure)
+
+        assert info["message"] == "Encoded failure"
+        assert info["decoded"] is False
+        assert info["error"] == "codec unreachable"
+        assert info["error_type"] == "ConnectionError"

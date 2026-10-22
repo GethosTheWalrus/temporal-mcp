@@ -5,6 +5,9 @@ import sys
 from typing import Optional, Sequence
 
 from temporalio.client import Client, TLSConfig
+from temporalio.converter import DataConverter, DefaultFailureConverterWithEncodedAttributes
+
+from temporal_mcp.codec import CodecSettings
 
 
 class TemporalClientManager:
@@ -19,6 +22,7 @@ class TemporalClientManager:
         tls_client_key_path: Optional[str] = None,
         api_key: Optional[str] = None,
         allowed_namespaces: Optional[Sequence[str]] = None,
+        codec: Optional[CodecSettings] = None,
     ):
         """Initialize the Temporal client manager.
 
@@ -31,6 +35,7 @@ class TemporalClientManager:
             api_key: API key for Temporal Cloud authentication
             allowed_namespaces: Namespaces callers may select. None permits only the
                 configured default; ["*"] permits any namespace.
+            codec: Remote codec server used to encode/decode payloads and failure messages
         """
         self.temporal_host = temporal_host
         if not isinstance(namespace, str) or not namespace.strip():
@@ -41,6 +46,9 @@ class TemporalClientManager:
         self.tls_client_key_path = tls_client_key_path
         self.api_key = api_key
         self.allowed_namespaces = self._normalize_allowed_namespaces(allowed_namespaces)
+        self.codec = codec
+        if codec:
+            print(f"Using remote codec at {codec.endpoint}", file=sys.stderr)
         self.client: Optional[Client] = None
         self._connect_lock = asyncio.Lock()
 
@@ -69,6 +77,7 @@ class TemporalClientManager:
                     namespace=self.namespace,
                     tls=tls_config,
                     api_key=self.api_key if self.api_key else None,
+                    data_converter=self._build_data_converter(self.namespace),
                 )
                 print(f"Successfully connected to Temporal at {self.temporal_host}", file=sys.stderr)
             except Exception as e:
@@ -79,6 +88,16 @@ class TemporalClientManager:
                 raise
 
         return self.client
+
+    def _build_data_converter(self, namespace: str) -> DataConverter:
+        """Build the data converter for a namespace, adding the remote codec when an endpoint is configured."""
+        if not self.codec:
+            return DataConverter.default
+
+        return DataConverter(
+            payload_codec=self.codec.for_namespace(namespace),
+            failure_converter_class=DefaultFailureConverterWithEncodedAttributes,
+        )
 
     async def disconnect(self):
         """Release the Temporal client and its shared service connection."""
@@ -93,6 +112,8 @@ class TemporalClientManager:
 
         config = base_client.config()
         config["namespace"] = selected_namespace
+        if self.codec:
+            config["data_converter"] = self._build_data_converter(selected_namespace)
         return Client(**config)
 
     def resolve_namespace(self, namespace: Optional[str] = None) -> str:

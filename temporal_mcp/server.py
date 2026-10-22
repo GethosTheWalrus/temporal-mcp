@@ -9,6 +9,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import CallToolRequestParams, CallToolResult, ContentBlock, ListToolsResult, TextContent
 
 from .client import TemporalClientManager
+from .codec import CodecSettings
 from .tools.tool_definitions import get_all_tools
 from .utils.exceptions import format_connection_error, format_error_response
 
@@ -32,6 +33,7 @@ class TemporalMCPServer:
         tls_client_key_path: Optional[str] = None,
         api_key: Optional[str] = None,
         allowed_namespaces: Optional[Sequence[str]] = None,
+        codec: Optional[CodecSettings] = None,
     ):
         """Initialize the Temporal MCP server.
 
@@ -44,6 +46,7 @@ class TemporalMCPServer:
             api_key: API key for Temporal Cloud authentication
             allowed_namespaces: Namespaces callers may select. None permits only the
                 configured default; ["*"] permits any namespace.
+            codec: Remote codec server for payload/failure decoding
         """
         self.client_manager = TemporalClientManager(
             temporal_host=temporal_host,
@@ -53,6 +56,7 @@ class TemporalMCPServer:
             tls_client_key_path=tls_client_key_path,
             api_key=api_key,
             allowed_namespaces=allowed_namespaces,
+            codec=codec,
         )
         self.server = Server(
             "temporal-mcp-server",

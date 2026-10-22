@@ -1,0 +1,25 @@
+"""HTTP helpers for talking to the codec server."""
+
+import urllib.parse
+import urllib.request
+from typing import Any
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+
+_opener = urllib.request.build_opener(_NoRedirectHandler)
+
+
+def open_without_redirects(request: urllib.request.Request, timeout: float) -> Any:
+    """Open a request without following redirects, so credentials are never forwarded to another host."""
+    return _opener.open(request, timeout=timeout)
+
+
+def require_http_url(url: str, name: str) -> str:
+    """Return the URL without a trailing slash, rejecting anything but http(s) (urllib also opens file: and ftp: URLs)."""
+    if urllib.parse.urlparse(url).scheme not in ("http", "https"):
+        raise ValueError(f"{name} must be an http(s) URL")
+    return url.rstrip("/")
