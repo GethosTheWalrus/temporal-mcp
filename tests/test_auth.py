@@ -7,7 +7,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
-from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
 
 import pytest
@@ -44,7 +44,7 @@ def oauth_server():
         "token_responses": [],
         "refresh_response": SUCCESS,
         "refresh_delay": 0,
-        "redirect_to": None,
+        "redirect": False,
     }
 
     class Handler(BaseHTTPRequestHandler):
@@ -52,9 +52,10 @@ def oauth_server():
             form = {k: v[0] for k, v in parse_qs(self.rfile.read(int(self.headers["Content-Length"])).decode()).items()}
             state["requests"].append({"path": self.path, "form": form})
             state["times"].append(time.monotonic())
-            if state["redirect_to"]:
+            if state["redirect"]:
                 self.send_response(302)
-                self.send_header("Location", state["redirect_to"])
+                # Fixed path: never build a Location header from test-controlled data.
+                self.send_header("Location", "/redirected")
                 self.send_header("Content-Length", "0")
                 self.end_headers()
                 return
@@ -132,7 +133,8 @@ class TestGetToken:
         url, state = oauth_server
         cache = tmp_path / "token.json"
         _write_cache(cache, expires_in=-10)
-        os.chmod(cache, 0o644)
+        # Deliberately world-readable so the test can prove the provider tightens it to 0600.
+        cache.chmod(0o644)
 
         _provider(cache, url).get_token()
 
@@ -433,28 +435,12 @@ class TestUrls:
     @pytest.mark.asyncio
     async def test_oauth_redirect_is_not_followed(self, tmp_path, oauth_server):
         url, state = oauth_server
-        received = []
-
-        class Target(BaseHTTPRequestHandler):
-            def do_POST(self):
-                received.append(self.path)
-                self.send_response(200)
-                self.send_header("Content-Length", "2")
-                self.end_headers()
-                self.wfile.write(b"{}")
-
-            def log_message(self, *args):
-                pass
-
-        target = HTTPServer(("127.0.0.1", 0), Target)
-        threading.Thread(target=target.serve_forever, daemon=True).start()
-        state["redirect_to"] = f"http://127.0.0.1:{target.server_port}/oauth/device/code"
+        state["redirect"] = True
 
         with pytest.raises(Exception, match="HTTP 302"):
             await _provider(tmp_path / "token.json", url).start_login()
-        target.shutdown()
 
-        assert received == []
+        assert [request["path"] for request in state["requests"]] == ["/oauth/device/code"]
 
 
 class TestServerTools:
