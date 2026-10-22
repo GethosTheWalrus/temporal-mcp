@@ -1,5 +1,6 @@
 """Tests for error handling in handler tools."""
 
+import asyncio
 import json
 
 import pytest
@@ -78,3 +79,34 @@ class TestErrorHandling:
         result = await server._call_tool(None, CallToolRequestParams(name="describe_workflow", arguments={"workflow_id": "wf"}))
 
         assert result.model_dump(by_alias=True)["isError"] is False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "tool, arguments, error_type",
+        [
+            ("get_workflow_result", {"workflow_id": "wf", "timeout": 1}, "timeout"),
+            ("get_activity_result", {"activity_id": "act", "timeout": 1}, "timeout"),
+            ("get_workflow_event", {"workflow_id": "wf", "event_id": 99}, "not_found"),
+        ],
+    )
+    async def test_mcp_call_tool_marks_soft_handler_failures_as_errors(self, tool, arguments, error_type):
+        server = TemporalMCPServer(namespace="default")
+        client = MagicMock()
+        workflow_handle = MagicMock()
+        workflow_handle.result = AsyncMock(side_effect=asyncio.TimeoutError)
+
+        async def empty_history():
+            if False:
+                yield None
+
+        workflow_handle.fetch_history_events = empty_history
+        activity_handle = MagicMock()
+        activity_handle.result = AsyncMock(side_effect=asyncio.TimeoutError)
+        client.get_workflow_handle.return_value = workflow_handle
+        client.get_activity_handle.return_value = activity_handle
+        server.client_manager.get_client = AsyncMock(return_value=client)
+
+        result = await server._call_tool(None, CallToolRequestParams(name=tool, arguments=arguments))
+
+        assert result.model_dump(by_alias=True)["isError"] is True
+        assert json.loads(result.content[0].text)["type"] == error_type
