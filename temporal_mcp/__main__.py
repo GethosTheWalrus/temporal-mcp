@@ -86,13 +86,13 @@ def _build_codec(args: argparse.Namespace) -> Optional[CodecSettings]:
     auth = args.codec_auth or os.environ.get("TEMPORAL_CODEC_AUTH")
     if not endpoint:
         if auth:
-            sys.exit("--codec-auth requires --codec-endpoint (TEMPORAL_CODEC_ENDPOINT)")
+            raise SystemExit("--codec-auth requires --codec-endpoint (TEMPORAL_CODEC_ENDPOINT)")
         return None
 
     try:
         return CodecSettings(endpoint=endpoint, auth=auth)
     except ValueError as e:
-        sys.exit(str(e))
+        raise SystemExit(str(e))
 
 
 def main():

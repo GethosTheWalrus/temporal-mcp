@@ -26,7 +26,7 @@ class CodecSettings:
     auth: Optional[str] = None
 
     def __post_init__(self) -> None:
-        require_http_url(self.endpoint, "Codec endpoint")
+        object.__setattr__(self, "endpoint", require_http_url(self.endpoint, "Codec endpoint"))
 
     def for_namespace(self, namespace: str) -> "RemoteCodec":
         """Build a codec that sends the given namespace, which codec servers use to select keys."""

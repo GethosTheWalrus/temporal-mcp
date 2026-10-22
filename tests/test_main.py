@@ -284,3 +284,7 @@ class TestCodecConfig:
     def test_non_http_endpoint_exits(self):
         with pytest.raises(SystemExit, match="http"):
             _run_main([], {"TEMPORAL_CODEC_ENDPOINT": "file:///etc/passwd"})
+
+    def test_endpoint_without_a_host_exits(self):
+        with pytest.raises(SystemExit, match="host"):
+            _run_main([], {"TEMPORAL_CODEC_ENDPOINT": "https:///decode"})
