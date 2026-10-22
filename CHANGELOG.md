@@ -2,6 +2,27 @@
 
 <!-- version list -->
 
+## v1.12.0 (2026-10-22)
+
+### Bug Fixes
+
+- Resolve CodeQL findings in codec support
+  ([#100](https://github.com/GethosTheWalrus/temporal-mcp/pull/100),
+  [`d0082bb`](https://github.com/GethosTheWalrus/temporal-mcp/commit/d0082bb38fc3b0be99ffeb32d08afb622e8ceb2c))
+
+### Features
+
+- Refresh codec tokens in-process and add codec login tools
+  ([#100](https://github.com/GethosTheWalrus/temporal-mcp/pull/100),
+  [`d0082bb`](https://github.com/GethosTheWalrus/temporal-mcp/commit/d0082bb38fc3b0be99ffeb32d08afb622e8ceb2c))
+
+### Testing
+
+- Avoid world-readable token cache in auth test
+  ([#100](https://github.com/GethosTheWalrus/temporal-mcp/pull/100),
+  [`d0082bb`](https://github.com/GethosTheWalrus/temporal-mcp/commit/d0082bb38fc3b0be99ffeb32d08afb622e8ceb2c))
+
+
 ## v1.11.1 (2026-10-22)
 
 ### Bug Fixes
