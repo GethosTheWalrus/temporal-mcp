@@ -10,6 +10,7 @@ from google.protobuf.json_format import MessageToDict, ParseDict
 from temporalio.api.common.v1 import Payload, Payloads
 from temporalio.converter import PayloadCodec
 
+from temporal_mcp.auth import CodecTokenProvider
 from temporal_mcp.http_util import open_without_redirects, require_http_url
 
 
@@ -20,17 +21,19 @@ class CodecSettings:
     Attributes:
         endpoint: Base URL of the codec server
         auth: Full Authorization header value, e.g. "Bearer <token>"
+        token_provider: Supplies a fresh bearer token for every request. Takes precedence over auth.
     """
 
     endpoint: str
     auth: Optional[str] = None
+    token_provider: Optional[CodecTokenProvider] = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "endpoint", require_http_url(self.endpoint, "Codec endpoint"))
 
     def for_namespace(self, namespace: str) -> "RemoteCodec":
         """Build a codec that sends the given namespace, which codec servers use to select keys."""
-        return RemoteCodec(self.endpoint, namespace, self.auth)
+        return RemoteCodec(self.endpoint, namespace, self.auth, self.token_provider)
 
 
 class RemoteCodec(PayloadCodec):
@@ -41,6 +44,7 @@ class RemoteCodec(PayloadCodec):
         endpoint: str,
         namespace: str,
         auth: Optional[str] = None,
+        token_provider: Optional[CodecTokenProvider] = None,
         timeout: float = 30.0,
     ):
         """Initialize the remote codec.
@@ -49,11 +53,13 @@ class RemoteCodec(PayloadCodec):
             endpoint: Base URL of the codec server
             namespace: Namespace sent in the X-Namespace header
             auth: Full Authorization header value, e.g. "Bearer <token>"
+            token_provider: Supplies a fresh bearer token for every request. Takes precedence over auth.
             timeout: Request timeout in seconds
         """
         self.endpoint = endpoint.rstrip("/")
         self.namespace = namespace
         self.auth = auth
+        self.token_provider = token_provider
         self.timeout = timeout
 
     async def encode(self, payloads: Sequence[Payload]) -> list[Payload]:
@@ -79,8 +85,14 @@ class RemoteCodec(PayloadCodec):
             method="POST",
             headers={"Content-Type": "application/json", "X-Namespace": self.namespace},
         )
-        if self.auth:
-            request.add_header("Authorization", self.auth)
+        authorization = self._authorization()
+        if authorization:
+            request.add_header("Authorization", authorization)
         with open_without_redirects(request, self.timeout) as response:
             decoded: dict = json.loads(response.read())
         return decoded
+
+    def _authorization(self) -> Optional[str]:
+        if self.token_provider:
+            return f"Bearer {self.token_provider.get_token()}"
+        return self.auth

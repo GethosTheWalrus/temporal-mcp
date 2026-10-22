@@ -1,4 +1,4 @@
-"""HTTP helpers for talking to the codec server."""
+"""HTTP helpers for talking to the codec server and the OAuth server."""
 
 import urllib.parse
 import urllib.request

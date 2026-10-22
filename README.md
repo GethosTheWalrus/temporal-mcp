@@ -45,6 +45,13 @@ Read more on the [Temporal Code Exchange](https://temporal.io/code-exchange/temp
 - **`delete_schedule`** - Permanently delete a schedule
 - **`trigger_schedule`** - Manually trigger a scheduled workflow immediately
 
+### Codec Authentication
+
+Only listed when `--codec-token-cache` is set (see [Remote codec](#remote-codec)).
+
+- **`codec_auth_status`** - Show whether the codec server login is valid
+- **`codec_login`** - Refresh the codec server token, or start a device login that returns a URL and code to open in a browser
+
 ## Temporal Documentation
 
 For more information about Temporal, refer to the official Temporal documentation:
@@ -126,6 +133,10 @@ Recommended when running from PyPI via [`uvx`](https://docs.astral.sh/uv/guides/
 | API key | `--api-key` | `TEMPORAL_API_KEY` | — |
 | Codec server URL | `--codec-endpoint` | `TEMPORAL_CODEC_ENDPOINT` | — |
 | Codec `Authorization` header | `--codec-auth` | `TEMPORAL_CODEC_AUTH` | — |
+| Codec token cache file | `--codec-token-cache` | `TEMPORAL_CODEC_TOKEN_CACHE` | — |
+| Codec OAuth server URL | `--codec-oauth-url` | `TEMPORAL_CODEC_OAUTH_URL` | — |
+| Codec OAuth client ID | `--codec-oauth-client-id` | `TEMPORAL_CODEC_OAUTH_CLIENT_ID` | — |
+| Codec OAuth audience | `--codec-oauth-audience` | `TEMPORAL_CODEC_OAUTH_AUDIENCE` | — |
 
 CLI arguments take precedence over environment variables. When `TEMPORAL_API_KEY` is set, TLS is enabled automatically. When mTLS cert/key paths are provided, TLS is also enabled automatically.
 
@@ -139,7 +150,12 @@ When payloads or failure messages are encrypted by a [codec server](https://docs
 
 Each request carries the namespace in an `X-Namespace` header, and requests for other allowed namespaces use their own. Only `http` and `https` endpoints are accepted, and redirects are never followed, so credentials are not forwarded to another host.
 
-If the codec server requires authentication, pass the full header value with `--codec-auth "Bearer <token>"` (or `TEMPORAL_CODEC_AUTH`). You are responsible for renewing it.
+Authenticate to the codec server in one of two ways:
+
+- **Static header:** `--codec-auth "Bearer <token>"`. You are responsible for renewing it.
+- **OAuth with a token cache:** set `--codec-token-cache` together with `--codec-oauth-url`, `--codec-oauth-client-id` and `--codec-oauth-audience`, all required. The server refreshes the access token itself and persists it to the cache file, which takes precedence over `--codec-auth`. This enables the `codec_login` and `codec_auth_status` tools: call `codec_login` to refresh silently, or to start a device-code login that returns a URL and code and completes in the background once you approve it in a browser. When no valid token is available, decoding reports an error pointing to `codec_login`.
+
+The OAuth server must be Auth0-compatible: it needs to serve `/oauth/device/code` and `/oauth/token`, accept an `audience` parameter, and issue refresh tokens for the `offline_access` scope. The token cache is a JSON file with `access_token`, `refresh_token`, `token_type` and `expires_at` (RFC 3339). Its directory must be writable, because the file is replaced atomically. Refresh tokens may rotate, so do not share one cache file between this server and another client.
 
 ## Development
 

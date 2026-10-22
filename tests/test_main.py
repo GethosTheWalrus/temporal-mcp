@@ -263,6 +263,22 @@ class TestArgPrecedenceOverEnv:
 
 class TestCodecConfig:
     ENDPOINT = {"TEMPORAL_CODEC_ENDPOINT": "https://codec.example"}
+    OAUTH_ENV = {
+        "TEMPORAL_CODEC_TOKEN_CACHE": "/auth/token.json",
+        "TEMPORAL_CODEC_OAUTH_URL": "https://login.example",
+        "TEMPORAL_CODEC_OAUTH_CLIENT_ID": "client",
+        "TEMPORAL_CODEC_OAUTH_AUDIENCE": "https://aud",
+    }
+    OAUTH_FLAGS = [
+        "--codec-token-cache",
+        "/flag/token.json",
+        "--codec-oauth-url",
+        "https://flag-login.example",
+        "--codec-oauth-client-id",
+        "flag-client",
+        "--codec-oauth-audience",
+        "https://flag-aud",
+    ]
 
     def test_no_codec_by_default(self):
         assert _run_main([])["codec"] is None
@@ -270,16 +286,34 @@ class TestCodecConfig:
     def test_endpoint_and_auth_from_env(self):
         codec = _run_main([], {**self.ENDPOINT, "TEMPORAL_CODEC_AUTH": "Bearer static"})["codec"]
 
-        assert (codec.endpoint, codec.auth) == ("https://codec.example", "Bearer static")
+        assert (codec.endpoint, codec.auth, codec.token_provider) == ("https://codec.example", "Bearer static", None)
 
     def test_flags_take_precedence_over_env(self):
         codec = _run_main(["--codec-endpoint", "https://flag.example", "--codec-auth", "Bearer flag"], {**self.ENDPOINT, "TEMPORAL_CODEC_AUTH": "Bearer env"})["codec"]
 
         assert (codec.endpoint, codec.auth) == ("https://flag.example", "Bearer flag")
 
-    def test_auth_requires_an_endpoint(self):
+    def test_token_provider_from_env(self):
+        provider = _run_main([], {**self.ENDPOINT, **self.OAUTH_ENV})["codec"].token_provider
+
+        assert (provider.cache_path, provider.login_url, provider.client_id, provider.audience) == ("/auth/token.json", "https://login.example", "client", "https://aud")
+
+    def test_token_provider_from_flags_overrides_env(self):
+        provider = _run_main(self.OAUTH_FLAGS, {**self.ENDPOINT, **self.OAUTH_ENV})["codec"].token_provider
+
+        assert (provider.cache_path, provider.login_url, provider.client_id, provider.audience) == ("/flag/token.json", "https://flag-login.example", "flag-client", "https://flag-aud")
+
+    @pytest.mark.parametrize("missing", ["TEMPORAL_CODEC_OAUTH_URL", "TEMPORAL_CODEC_OAUTH_CLIENT_ID", "TEMPORAL_CODEC_OAUTH_AUDIENCE"])
+    def test_token_cache_requires_every_oauth_setting(self, missing):
+        env = {**self.ENDPOINT, **{k: v for k, v in self.OAUTH_ENV.items() if k != missing}}
+
+        with pytest.raises(SystemExit, match=missing):
+            _run_main([], env)
+
+    @pytest.mark.parametrize("env", [{"TEMPORAL_CODEC_AUTH": "Bearer t"}, {"TEMPORAL_CODEC_TOKEN_CACHE": "/auth/token.json"}])
+    def test_codec_options_require_an_endpoint(self, env):
         with pytest.raises(SystemExit, match="--codec-endpoint"):
-            _run_main([], {"TEMPORAL_CODEC_AUTH": "Bearer t"})
+            _run_main([], env)
 
     def test_non_http_endpoint_exits(self):
         with pytest.raises(SystemExit, match="http"):
@@ -288,3 +322,7 @@ class TestCodecConfig:
     def test_endpoint_without_a_host_exits(self):
         with pytest.raises(SystemExit, match="host"):
             _run_main([], {"TEMPORAL_CODEC_ENDPOINT": "https:///decode"})
+
+    def test_non_http_oauth_url_exits(self):
+        with pytest.raises(SystemExit, match="http"):
+            _run_main([], {**self.ENDPOINT, **self.OAUTH_ENV, "TEMPORAL_CODEC_OAUTH_URL": "file:///etc/passwd"})
