@@ -2,6 +2,48 @@
 
 <!-- version list -->
 
+## v1.11.0 (2026-10-22)
+
+### Chores
+
+- **deps**: Bump google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml
+  ([#97](https://github.com/GethosTheWalrus/temporal-mcp/pull/97),
+  [`8f6008a`](https://github.com/GethosTheWalrus/temporal-mcp/commit/8f6008a9c83126a98fffe987e9672c8620f9c118))
+
+- **deps**: Bump google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml
+  ([#98](https://github.com/GethosTheWalrus/temporal-mcp/pull/98),
+  [`0e3182b`](https://github.com/GethosTheWalrus/temporal-mcp/commit/0e3182b32ebd8a59d96749ca8e6483305d42400b))
+
+- **deps**: Update mcp requirement ([#89](https://github.com/GethosTheWalrus/temporal-mcp/pull/89),
+  [`ab49fb5`](https://github.com/GethosTheWalrus/temporal-mcp/commit/ab49fb5ea55de9db0098982adfeed5144033e8f3))
+
+- **deps-dev**: Update black requirement from >=26.10.0 to >=26.10.1
+  ([#96](https://github.com/GethosTheWalrus/temporal-mcp/pull/96),
+  [`2673acf`](https://github.com/GethosTheWalrus/temporal-mcp/commit/2673acf5bb891cc52d8d586f2f8d07ace57f5a85))
+
+- **deps-dev**: Update black requirement from >=26.5.1 to >=26.10.0
+  ([#91](https://github.com/GethosTheWalrus/temporal-mcp/pull/91),
+  [`23b3b8a`](https://github.com/GethosTheWalrus/temporal-mcp/commit/23b3b8adfa86e93dadeeff4348cdd93e164d0001))
+
+- **deps-dev**: Update filelock requirement from >=4.0.12 to >=4.1.0
+  ([#95](https://github.com/GethosTheWalrus/temporal-mcp/pull/95),
+  [`52ab1e8`](https://github.com/GethosTheWalrus/temporal-mcp/commit/52ab1e82f0c975508768e45b694bebb713a4b75f))
+
+- **deps-dev**: Update filelock requirement from >=4.0.8 to >=4.0.12
+  ([#90](https://github.com/GethosTheWalrus/temporal-mcp/pull/90),
+  [`7c8167f`](https://github.com/GethosTheWalrus/temporal-mcp/commit/7c8167f3fbe66407408ae2b5267f328304bc5da6))
+
+- **deps-dev**: Update mypy requirement from >=2.3.1 to >=2.4.0
+  ([#92](https://github.com/GethosTheWalrus/temporal-mcp/pull/92),
+  [`4812885`](https://github.com/GethosTheWalrus/temporal-mcp/commit/4812885a37a7833f7289ce5a0eb9e64a56a500d8))
+
+### Features
+
+- Decode encrypted payloads and failures through a remote codec server
+  ([#99](https://github.com/GethosTheWalrus/temporal-mcp/pull/99),
+  [`835ebc3`](https://github.com/GethosTheWalrus/temporal-mcp/commit/835ebc3f74ef6acd6bd7d10ee950575ba7e12622))
+
+
 ## v1.10.2 (2026-10-11)
 
 ### Bug Fixes
