@@ -3,7 +3,7 @@
 
 # Testing
 pytest>=9.2.0
-pytest-asyncio>=1.4.0
+pytest-asyncio>=1.4.1
 
 # Code quality
 black>=26.10.1
