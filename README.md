@@ -130,6 +130,8 @@ Recommended when running from PyPI via [`uvx`](https://docs.astral.sh/uv/guides/
 | TLS | `--tls-enabled` | `TEMPORAL_TLS_ENABLED` | auto-detect |
 | mTLS cert path | `--tls-cert` | `TEMPORAL_TLS_CLIENT_CERT_PATH` | — |
 | mTLS key path | `--tls-key` | `TEMPORAL_TLS_CLIENT_KEY_PATH` | — |
+| Server CA path | `--tls-server-ca` | `TEMPORAL_TLS_SERVER_CA_PATH` | system roots |
+| Server name | `--tls-server-name` | `TEMPORAL_TLS_SERVER_NAME` | the host |
 | API key | `--api-key` | `TEMPORAL_API_KEY` | — |
 | Codec server URL | `--codec-endpoint` | `TEMPORAL_CODEC_ENDPOINT` | — |
 | Codec `Authorization` header | `--codec-auth` | `TEMPORAL_CODEC_AUTH` | — |
@@ -138,7 +140,7 @@ Recommended when running from PyPI via [`uvx`](https://docs.astral.sh/uv/guides/
 | Codec OAuth client ID | `--codec-oauth-client-id` | `TEMPORAL_CODEC_OAUTH_CLIENT_ID` | — |
 | Codec OAuth audience | `--codec-oauth-audience` | `TEMPORAL_CODEC_OAUTH_AUDIENCE` | — |
 
-CLI arguments take precedence over environment variables. When `TEMPORAL_API_KEY` is set, TLS is enabled automatically. When mTLS cert/key paths are provided, TLS is also enabled automatically.
+CLI arguments take precedence over environment variables. When `TEMPORAL_API_KEY` is set, TLS is enabled automatically. When mTLS cert/key paths are provided, TLS is also enabled automatically. For a self-hosted cluster whose certificate is signed by a private CA, set the server CA path; set the server name when the certificate does not cover the address you connect to (for example, connecting by IP). Either one enables TLS.
 
 Every tool accepts an optional `namespace` argument. If omitted, the server uses `--namespace`, then `TEMPORAL_NAMESPACE`, then `default`. Runtime overrides are disabled by default: set `TEMPORAL_ALLOWED_NAMESPACES` to a comma-separated allowlist such as `default,payments`, or set it to `*` to permit any namespace reachable through the configured Temporal host and credentials. A finite allowlist must include the configured default namespace.
 
