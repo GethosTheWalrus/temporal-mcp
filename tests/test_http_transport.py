@@ -57,6 +57,16 @@ class TestWithToken:
             resp = client.post("/mcp", json=TOOLS_LIST, headers={**MCP_HEADERS, "Authorization": "Bearer s3cret"})
         assert resp.status_code == 200
 
+    def test_scheme_is_case_insensitive(self, make_client):
+        with make_client("s3cret") as client:
+            resp = client.post("/mcp", json=TOOLS_LIST, headers={**MCP_HEADERS, "Authorization": "bearer s3cret"})
+        assert resp.status_code == 200
+
+    def test_token_is_case_sensitive(self, make_client):
+        with make_client("s3cret") as client:
+            resp = client.post("/mcp", json=TOOLS_LIST, headers={**MCP_HEADERS, "Authorization": "Bearer S3CRET"})
+        assert resp.status_code == 401
+
     def test_other_paths_rejected(self, make_client):
         with make_client("s3cret") as client:
             assert client.get("/anything").status_code == 401

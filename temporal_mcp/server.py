@@ -243,12 +243,19 @@ class _RequireBearer:
 
     def __init__(self, app: ASGIApp, token: str):
         self.app = app
-        self.expected = f"Bearer {token}".encode()
+        self.expected = token.encode()
+
+    def _authorized(self, headers: list[bytes]) -> bool:
+        if len(headers) != 1:
+            return False
+        scheme, _, credentials = headers[0].partition(b" ")
+        # Auth schemes are case-insensitive (RFC 7235); the token is not.
+        return scheme.lower() == b"bearer" and hmac.compare_digest(credentials, self.expected)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] in ("http", "websocket") and scope["path"] != "/healthz":
             headers = [value for name, value in scope["headers"] if name == b"authorization"]
-            if len(headers) != 1 or not hmac.compare_digest(headers[0], self.expected):
+            if not self._authorized(headers):
                 if scope["type"] == "websocket":
                     await send({"type": "websocket.close", "code": 1008})
                     return
