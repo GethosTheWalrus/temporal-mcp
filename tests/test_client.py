@@ -103,6 +103,52 @@ class TestDetermineTlsConfig:
         tls = TemporalClientManager(temporal_host="localhost:7233")._determine_tls_config()
         assert tls is None
 
+    def test_mtls_with_private_ca_and_server_name(self, tmp_path):
+        for name, data in (("client.pem", b"CERT"), ("client.key", b"KEY"), ("ca.pem", b"CA")):
+            (tmp_path / name).write_bytes(data)
+
+        tls = TemporalClientManager(
+            temporal_host="10.0.0.5:7233",
+            tls_client_cert_path=str(tmp_path / "client.pem"),
+            tls_client_key_path=str(tmp_path / "client.key"),
+            tls_server_ca_path=str(tmp_path / "ca.pem"),
+            tls_server_name="frontend.internal",
+        )._determine_tls_config()
+        assert isinstance(tls, TLSConfig)
+        assert tls.client_cert == b"CERT"
+        assert tls.server_root_ca_cert == b"CA"
+        assert tls.domain == "frontend.internal"
+
+    def test_server_ca_alone_enables_tls(self, tmp_path):
+        ca_file = tmp_path / "ca.pem"
+        ca_file.write_bytes(b"CA")
+        tls = TemporalClientManager(temporal_host="localhost:7233", tls_server_ca_path=str(ca_file))._determine_tls_config()
+        assert isinstance(tls, TLSConfig)
+        assert tls.server_root_ca_cert == b"CA"
+        assert tls.client_cert is None
+
+    def test_server_name_alone_enables_tls(self):
+        tls = TemporalClientManager(temporal_host="localhost:7233", tls_server_name="frontend.internal")._determine_tls_config()
+        assert isinstance(tls, TLSConfig)
+        assert tls.domain == "frontend.internal"
+        assert tls.server_root_ca_cert is None
+
+    def test_api_key_with_server_ca(self, tmp_path):
+        ca_file = tmp_path / "ca.pem"
+        ca_file.write_bytes(b"CA")
+        tls = TemporalClientManager(api_key="k", tls_server_ca_path=str(ca_file))._determine_tls_config()
+        assert tls.server_root_ca_cert == b"CA"
+
+    def test_missing_server_ca_raises(self):
+        mgr = TemporalClientManager(tls_server_ca_path="/nonexistent/ca.pem")
+        with pytest.raises(FileNotFoundError):
+            mgr._determine_tls_config()
+
+    def test_no_server_options_keeps_default_roots(self):
+        tls = TemporalClientManager(temporal_host="my-namespace.tmprl.cloud:7233")._determine_tls_config()
+        assert tls.server_root_ca_cert is None
+        assert tls.domain is None
+
 
 class TestConnect:
     @pytest.mark.asyncio

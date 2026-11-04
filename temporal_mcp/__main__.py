@@ -61,6 +61,18 @@ def _parse_args() -> argparse.Namespace:
         help="Path to mTLS client private key file (env: TEMPORAL_TLS_CLIENT_KEY_PATH)",
     )
     parser.add_argument(
+        "--tls-server-ca",
+        metavar="PATH",
+        default=None,
+        help="Path to a CA certificate that signs the server certificate, for servers behind a private CA (env: TEMPORAL_TLS_SERVER_CA_PATH)",
+    )
+    parser.add_argument(
+        "--tls-server-name",
+        metavar="NAME",
+        default=None,
+        help="Name to verify the server certificate against, when it differs from the host, e.g. connecting by IP (env: TEMPORAL_TLS_SERVER_NAME)",
+    )
+    parser.add_argument(
         "--api-key",
         metavar="KEY",
         default=None,
@@ -158,6 +170,10 @@ def main():
     tls_client_cert_path = args.tls_cert or os.environ.get("TEMPORAL_TLS_CLIENT_CERT_PATH")
     tls_client_key_path = args.tls_key or os.environ.get("TEMPORAL_TLS_CLIENT_KEY_PATH")
 
+    # Server verification for self-hosted clusters behind a private CA
+    tls_server_ca_path = args.tls_server_ca or os.environ.get("TEMPORAL_TLS_SERVER_CA_PATH")
+    tls_server_name = args.tls_server_name or os.environ.get("TEMPORAL_TLS_SERVER_NAME")
+
     # API key authentication (for Temporal Cloud)
     api_key = args.api_key or os.environ.get("TEMPORAL_API_KEY")
     allowed_namespaces_raw = os.environ.get("TEMPORAL_ALLOWED_NAMESPACES")
@@ -173,6 +189,10 @@ def main():
         print(f"mTLS client cert: {tls_client_cert_path}", file=sys.stderr)
     if tls_client_key_path:
         print(f"mTLS client key:  {tls_client_key_path}", file=sys.stderr)
+    if tls_server_ca_path:
+        print(f"Server CA:        {tls_server_ca_path}", file=sys.stderr)
+    if tls_server_name:
+        print(f"Server name:      {tls_server_name}", file=sys.stderr)
     if api_key:
         print("API key authentication: enabled", file=sys.stderr)
 
@@ -182,6 +202,8 @@ def main():
         tls_enabled=tls_enabled,
         tls_client_cert_path=tls_client_cert_path,
         tls_client_key_path=tls_client_key_path,
+        tls_server_ca_path=tls_server_ca_path,
+        tls_server_name=tls_server_name,
         api_key=api_key,
         allowed_namespaces=allowed_namespaces,
         codec=codec,
