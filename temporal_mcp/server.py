@@ -1,11 +1,18 @@
 """Main MCP Server for Temporal workflow orchestration."""
 
+import hmac
 import json
 import sys
 from typing import Any, Optional, Sequence
 
+import uvicorn
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse
+from starlette.routing import Route
+from starlette.types import ASGIApp, Receive, Scope, Send
 from mcp.types import CallToolRequestParams, CallToolResult, ContentBlock, ListToolsResult, TextContent
 
 from .client import TemporalClientManager
@@ -190,9 +197,61 @@ class TemporalMCPServer:
             return CallToolResult(content=list(format_error_response(e, name)), is_error=True)
 
     async def run(self):
-        """Run the MCP server."""
+        """Run the MCP server over stdio."""
         try:
             async with stdio_server() as (read_stream, write_stream):
                 await self.server.run(read_stream, write_stream, self.server.create_initialization_options())
         finally:
             await self.client_manager.disconnect()
+
+    def http_app(self, host: str = "127.0.0.1", bearer_token: Optional[str] = None) -> ASGIApp:
+        """Build the streamable HTTP app: MCP at /mcp, an unauthenticated probe at /healthz.
+
+        Stateless: every request stands alone, so replicas need no session affinity.
+
+        Args:
+            host: Address the app will listen on. On loopback, the MCP SDK also
+                enables its DNS-rebinding protection.
+            bearer_token: When set, every request except /healthz must carry
+                "Authorization: Bearer <token>".
+        """
+
+        async def healthz(_request: Request) -> PlainTextResponse:
+            return PlainTextResponse("ok")
+
+        app: Starlette = self.server.streamable_http_app(
+            stateless_http=True,
+            json_response=True,
+            host=host,
+            custom_starlette_routes=[Route("/healthz", healthz)],
+        )
+        if bearer_token:
+            return _RequireBearer(app, bearer_token)
+        return app
+
+    async def run_http(self, host: str, port: int, bearer_token: Optional[str] = None):
+        """Run the MCP server over streamable HTTP."""
+        config = uvicorn.Config(self.http_app(host, bearer_token), host=host, port=port, log_level="info")
+        try:
+            await uvicorn.Server(config).serve()
+        finally:
+            await self.client_manager.disconnect()
+
+
+class _RequireBearer:
+    """Rejects every request without the expected bearer token, except the /healthz probe."""
+
+    def __init__(self, app: ASGIApp, token: str):
+        self.app = app
+        self.expected = f"Bearer {token}".encode()
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] in ("http", "websocket") and scope["path"] != "/healthz":
+            headers = [value for name, value in scope["headers"] if name == b"authorization"]
+            if len(headers) != 1 or not hmac.compare_digest(headers[0], self.expected):
+                if scope["type"] == "websocket":
+                    await send({"type": "websocket.close", "code": 1008})
+                    return
+                await PlainTextResponse("unauthorized", status_code=401, headers={"WWW-Authenticate": "Bearer"})(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
