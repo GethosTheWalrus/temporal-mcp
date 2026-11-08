@@ -31,6 +31,8 @@ class TemporalMCPServer:
         tls_enabled: Optional[bool] = None,
         tls_client_cert_path: Optional[str] = None,
         tls_client_key_path: Optional[str] = None,
+        tls_server_ca_path: Optional[str] = None,
+        tls_server_name: Optional[str] = None,
         api_key: Optional[str] = None,
         allowed_namespaces: Optional[Sequence[str]] = None,
         codec: Optional[CodecSettings] = None,
@@ -43,6 +45,8 @@ class TemporalMCPServer:
             tls_enabled: Whether to use TLS for connection (None = auto-detect, True = force enable, False = force disable)
             tls_client_cert_path: Path to the TLS client certificate file (for mTLS / Temporal Cloud)
             tls_client_key_path: Path to the TLS client private key file (for mTLS / Temporal Cloud)
+            tls_server_ca_path: Path to a CA certificate used to verify the server (private CA)
+            tls_server_name: Server name to verify the server certificate against
             api_key: API key for Temporal Cloud authentication
             allowed_namespaces: Namespaces callers may select. None permits only the
                 configured default; ["*"] permits any namespace.
@@ -54,6 +58,8 @@ class TemporalMCPServer:
             tls_enabled=tls_enabled,
             tls_client_cert_path=tls_client_cert_path,
             tls_client_key_path=tls_client_key_path,
+            tls_server_ca_path=tls_server_ca_path,
+            tls_server_name=tls_server_name,
             api_key=api_key,
             allowed_namespaces=allowed_namespaces,
             codec=codec,

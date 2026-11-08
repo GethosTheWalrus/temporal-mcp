@@ -20,6 +20,8 @@ class TemporalClientManager:
         tls_enabled: Optional[bool] = None,
         tls_client_cert_path: Optional[str] = None,
         tls_client_key_path: Optional[str] = None,
+        tls_server_ca_path: Optional[str] = None,
+        tls_server_name: Optional[str] = None,
         api_key: Optional[str] = None,
         allowed_namespaces: Optional[Sequence[str]] = None,
         codec: Optional[CodecSettings] = None,
@@ -32,6 +34,8 @@ class TemporalClientManager:
             tls_enabled: Whether to use TLS for connection (None = auto-detect, True = force enable, False = force disable)
             tls_client_cert_path: Path to the TLS client certificate file (for mTLS / Temporal Cloud)
             tls_client_key_path: Path to the TLS client private key file (for mTLS / Temporal Cloud)
+            tls_server_ca_path: Path to a CA certificate used to verify the server, instead of the system roots
+            tls_server_name: Server name to verify the server certificate against, instead of the host
             api_key: API key for Temporal Cloud authentication
             allowed_namespaces: Namespaces callers may select. None permits only the
                 configured default; ["*"] permits any namespace.
@@ -44,6 +48,8 @@ class TemporalClientManager:
         self.tls_enabled = tls_enabled
         self.tls_client_cert_path = tls_client_cert_path
         self.tls_client_key_path = tls_client_key_path
+        self.tls_server_ca_path = tls_server_ca_path
+        self.tls_server_name = tls_server_name
         self.api_key = api_key
         self.allowed_namespaces = self._normalize_allowed_namespaces(allowed_namespaces)
         self.codec = codec
@@ -191,6 +197,25 @@ class TemporalClientManager:
         )
         return client_cert, client_key
 
+    def _load_server_tls_options(self) -> dict:
+        """Load the options used to verify the server certificate.
+
+        Returns:
+            TLSConfig keyword arguments for a private CA and/or a server name
+            override; empty when neither is configured.
+
+        Raises:
+            FileNotFoundError: If the configured CA path does not exist.
+        """
+        options: dict = {}
+        if self.tls_server_ca_path:
+            with open(self.tls_server_ca_path, "rb") as f:
+                options["server_root_ca_cert"] = f.read()
+            print(f"Loaded server CA certificate from {self.tls_server_ca_path}", file=sys.stderr)
+        if self.tls_server_name:
+            options["domain"] = self.tls_server_name
+        return options
+
     def _determine_tls_config(self) -> Optional[TLSConfig]:
         """Determine TLS configuration based on settings, hostname, and client certs.
 
@@ -198,17 +223,19 @@ class TemporalClientManager:
             TLS configuration or None
         """
         client_cert, client_key = self._load_client_certs()
+        server_options = self._load_server_tls_options()
 
         # If mTLS certs are provided, always enable TLS regardless of other settings
         if client_cert and client_key:
             return TLSConfig(
                 client_cert=client_cert,
                 client_private_key=client_key,
+                **server_options,
             )
 
-        # API key auth requires TLS
-        if self.api_key:
-            return TLSConfig()
+        # API key auth requires TLS; server verification options only make sense with TLS
+        if self.api_key or server_options:
+            return TLSConfig(**server_options)
 
         # Priority: explicit tls_enabled setting > auto-detect from hostname
         if self.tls_enabled is True:
