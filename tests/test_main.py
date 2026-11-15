@@ -261,6 +261,62 @@ class TestArgPrecedenceOverEnv:
 # ---------------------------------------------------------------------------
 
 
+class TestTransportConfig:
+    @staticmethod
+    def _run_capturing_asyncio(argv, env):
+        import sys
+        from unittest.mock import MagicMock, patch
+
+        server = MagicMock()
+        with (
+            patch.object(sys, "argv", ["temporal-mcp-server"] + argv),
+            patch.dict("os.environ", env, clear=True),
+            patch("temporal_mcp.__main__.TemporalMCPServer", return_value=server),
+            patch("temporal_mcp.__main__.asyncio.run"),
+        ):
+            from temporal_mcp.__main__ import main
+
+            main()
+        return server
+
+    def test_stdio_by_default(self):
+        server = self._run_capturing_asyncio([], {})
+        server.run.assert_called_once_with()
+        server.run_http.assert_not_called()
+
+    def test_http_on_loopback_without_token(self):
+        server = self._run_capturing_asyncio(["--transport", "http"], {})
+        server.run_http.assert_called_once_with("127.0.0.1", 8000, None)
+
+    def test_http_from_env_with_token(self):
+        env = {
+            "TEMPORAL_MCP_TRANSPORT": "http",
+            "TEMPORAL_MCP_HTTP_HOST": "0.0.0.0",
+            "TEMPORAL_MCP_HTTP_PORT": "9000",
+            "TEMPORAL_MCP_HTTP_BEARER_TOKEN": "s3cret",
+        }
+        server = self._run_capturing_asyncio([], env)
+        server.run_http.assert_called_once_with("0.0.0.0", 9000, "s3cret")
+
+    def test_args_override_env(self):
+        env = {"TEMPORAL_MCP_TRANSPORT": "stdio", "TEMPORAL_MCP_HTTP_PORT": "9000"}
+        server = self._run_capturing_asyncio(["--transport", "http", "--http-port", "9100"], env)
+        server.run_http.assert_called_once_with("127.0.0.1", 9100, None)
+
+    def test_refuses_unauthenticated_non_loopback(self):
+        with pytest.raises(SystemExit, match="Refusing to serve HTTP"):
+            self._run_capturing_asyncio(["--transport", "http", "--http-host", "0.0.0.0"], {})
+
+    def test_explicit_unauthenticated_opt_in(self):
+        env = {"TEMPORAL_MCP_HTTP_ALLOW_UNAUTHENTICATED": "true"}
+        server = self._run_capturing_asyncio(["--transport", "http", "--http-host", "0.0.0.0"], env)
+        server.run_http.assert_called_once_with("0.0.0.0", 8000, None)
+
+    def test_invalid_transport_env(self):
+        with pytest.raises(SystemExit, match="stdio or http"):
+            self._run_capturing_asyncio([], {"TEMPORAL_MCP_TRANSPORT": "sse"})
+
+
 class TestCodecConfig:
     ENDPOINT = {"TEMPORAL_CODEC_ENDPOINT": "https://codec.example"}
     OAUTH_ENV = {

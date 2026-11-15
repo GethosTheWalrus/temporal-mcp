@@ -102,7 +102,49 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="OAuth audience requested at login; required with --codec-token-cache (env: TEMPORAL_CODEC_OAUTH_AUDIENCE)",
     )
+    parser.add_argument(
+        "--transport",
+        default=None,
+        choices=["stdio", "http"],
+        type=str.lower,
+        help="stdio, or streamable HTTP served at /mcp (env: TEMPORAL_MCP_TRANSPORT, default: stdio)",
+    )
+    parser.add_argument(
+        "--http-host",
+        metavar="HOST",
+        default=None,
+        help="Address to listen on with --transport http (env: TEMPORAL_MCP_HTTP_HOST, default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--http-port",
+        metavar="PORT",
+        default=None,
+        type=int,
+        help="Port to listen on with --transport http (env: TEMPORAL_MCP_HTTP_PORT, default: 8000)",
+    )
     return parser.parse_args()
+
+
+_LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
+
+
+def _http_settings(args: argparse.Namespace) -> tuple[str, int, Optional[str]]:
+    """Resolve the HTTP listener, refusing to serve unauthenticated on a non-loopback address."""
+    host = args.http_host or os.environ.get("TEMPORAL_MCP_HTTP_HOST", "127.0.0.1")
+    try:
+        port = args.http_port or int(os.environ.get("TEMPORAL_MCP_HTTP_PORT", "8000"))
+    except ValueError:
+        raise SystemExit("TEMPORAL_MCP_HTTP_PORT must be an integer")
+    # Env only: a token on the command line is visible to every local user in the process list.
+    bearer_token = os.environ.get("TEMPORAL_MCP_HTTP_BEARER_TOKEN") or None
+    allow_unauthenticated = os.environ.get("TEMPORAL_MCP_HTTP_ALLOW_UNAUTHENTICATED", "").lower() == "true"
+    if not bearer_token and host not in _LOOPBACK_HOSTS and not allow_unauthenticated:
+        raise SystemExit(
+            f"Refusing to serve HTTP on {host} without TEMPORAL_MCP_HTTP_BEARER_TOKEN: anyone who reaches it "
+            "acts on Temporal with this server's credentials. Set a token, listen on loopback, or set "
+            "TEMPORAL_MCP_HTTP_ALLOW_UNAUTHENTICATED=true if another layer authenticates callers."
+        )
+    return host, port, bearer_token
 
 
 def _build_codec(args: argparse.Namespace) -> Optional[CodecSettings]:
@@ -165,6 +207,11 @@ def main():
 
     codec = _build_codec(args)
 
+    transport = args.transport or os.environ.get("TEMPORAL_MCP_TRANSPORT", "stdio").lower()
+    if transport not in ("stdio", "http"):
+        raise SystemExit(f"TEMPORAL_MCP_TRANSPORT must be stdio or http (got {transport!r})")
+    http_settings = _http_settings(args) if transport == "http" else None
+
     print(
         f"Starting MCP server with TEMPORAL_HOST={temporal_host}, TLS={tls_enabled}",
         file=sys.stderr,
@@ -186,7 +233,12 @@ def main():
         allowed_namespaces=allowed_namespaces,
         codec=codec,
     )
-    asyncio.run(server.run())
+    if http_settings:
+        host, port, bearer_token = http_settings
+        print(f"Serving streamable HTTP on {host}:{port}/mcp (bearer token: {'required' if bearer_token else 'not required'})", file=sys.stderr)
+        asyncio.run(server.run_http(host, port, bearer_token))
+    else:
+        asyncio.run(server.run())
 
 
 if __name__ == "__main__":

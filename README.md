@@ -137,10 +137,24 @@ Recommended when running from PyPI via [`uvx`](https://docs.astral.sh/uv/guides/
 | Codec OAuth server URL | `--codec-oauth-url` | `TEMPORAL_CODEC_OAUTH_URL` | — |
 | Codec OAuth client ID | `--codec-oauth-client-id` | `TEMPORAL_CODEC_OAUTH_CLIENT_ID` | — |
 | Codec OAuth audience | `--codec-oauth-audience` | `TEMPORAL_CODEC_OAUTH_AUDIENCE` | — |
+| Transport | `--transport` | `TEMPORAL_MCP_TRANSPORT` | `stdio` |
+| HTTP listen address | `--http-host` | `TEMPORAL_MCP_HTTP_HOST` | `127.0.0.1` |
+| HTTP port | `--http-port` | `TEMPORAL_MCP_HTTP_PORT` | `8000` |
+| HTTP bearer token | — | `TEMPORAL_MCP_HTTP_BEARER_TOKEN` | — |
 
 CLI arguments take precedence over environment variables. When `TEMPORAL_API_KEY` is set, TLS is enabled automatically. When mTLS cert/key paths are provided, TLS is also enabled automatically.
 
 Every tool accepts an optional `namespace` argument. If omitted, the server uses `--namespace`, then `TEMPORAL_NAMESPACE`, then `default`. Runtime overrides are disabled by default: set `TEMPORAL_ALLOWED_NAMESPACES` to a comma-separated allowlist such as `default,payments`, or set it to `*` to permit any namespace reachable through the configured Temporal host and credentials. A finite allowlist must include the configured default namespace.
+
+### Streamable HTTP
+
+With `--transport http` the server serves MCP at `http://<host>:<port>/mcp` instead of stdio, so one instance can be shared (for example behind an MCP gateway). It runs stateless, so replicas need no session affinity, and `/healthz` answers without authentication for probes.
+
+Every caller that reaches the endpoint acts on Temporal with this server's credentials. Set `TEMPORAL_MCP_HTTP_BEARER_TOKEN` and every request except `/healthz` must send `Authorization: Bearer <token>`. The token is read from the environment only, never from the command line, so it does not show up in the process list. The server refuses to start on a non-loopback address without a token, unless you set `TEMPORAL_MCP_HTTP_ALLOW_UNAUTHENTICATED=true` because another layer authenticates callers.
+
+```bash
+TEMPORAL_MCP_HTTP_BEARER_TOKEN=... temporal-mcp-server --transport http --http-host 0.0.0.0
+```
 
 ### Remote codec
 
