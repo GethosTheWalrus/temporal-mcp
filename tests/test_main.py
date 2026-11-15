@@ -174,6 +174,16 @@ class TestEnvVarFallback:
         kwargs = _run_main([], env={})
         assert kwargs["allowed_namespaces"] is None
 
+    def test_server_ca_and_name_from_env(self):
+        kwargs = _run_main([], env={"TEMPORAL_TLS_SERVER_CA_PATH": "/env/ca.pem", "TEMPORAL_TLS_SERVER_NAME": "frontend.internal"})
+        assert kwargs["tls_server_ca_path"] == "/env/ca.pem"
+        assert kwargs["tls_server_name"] == "frontend.internal"
+
+    def test_server_ca_and_name_unset(self):
+        kwargs = _run_main([], env={})
+        assert kwargs["tls_server_ca_path"] is None
+        assert kwargs["tls_server_name"] is None
+
 
 # ---------------------------------------------------------------------------
 # CLI args take precedence over env vars
@@ -181,6 +191,14 @@ class TestEnvVarFallback:
 
 
 class TestArgPrecedenceOverEnv:
+    def test_server_ca_and_name_args_override_env(self):
+        kwargs = _run_main(
+            ["--tls-server-ca", "/arg/ca.pem", "--tls-server-name", "arg.internal"],
+            env={"TEMPORAL_TLS_SERVER_CA_PATH": "/env/ca.pem", "TEMPORAL_TLS_SERVER_NAME": "env.internal"},
+        )
+        assert kwargs["tls_server_ca_path"] == "/arg/ca.pem"
+        assert kwargs["tls_server_name"] == "arg.internal"
+
     def test_host_arg_overrides_env(self):
         kwargs = _run_main(
             ["--host", "arghost:7233"],
